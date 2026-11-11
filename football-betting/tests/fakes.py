@@ -110,3 +110,43 @@ class FakeWorld:
             self.pushes.append({"title": msg["title"], "body": msg["message"], "priority": prio})
             return Response(200, {}, b"{}")
         raise ProviderError(provider, f"unexpected url {url}", 404)
+
+
+def synthetic_full_csv(end: date, seasons: int = 3, seed: int = 11, margin: float = 0.05) -> str:
+    """SYNTHETIC league with every statistic and bookmaker prices built from the TRUE
+    probabilities plus a margin: a correct backtest must find no edge here."""
+    from fbs.models import goal_market_probs, score_matrix
+    rng = random.Random(seed)
+    refs = ["Ref A", "Ref B", "Ref C", "Ref D"]
+    ref_card = {"Ref A": 0.7, "Ref B": 1.0, "Ref C": 1.2, "Ref D": 1.5}
+    cols = ("Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,HTHG,HTAG,Referee,HS,AS,HST,AST,HF,AF,HC,AC,HY,AY,HR,AR,"
+            "B365H,B365D,B365A,PSCH,PSCD,PSCA,B365>2.5,B365<2.5,PC>2.5,PC<2.5,AHh,B365AHH,B365AHA")
+    rows = [cols]
+    day = end - timedelta(days=330 * seasons)
+    while day < end:
+        teams = TEAMS[:]
+        rng.shuffle(teams)
+        for i in range(0, len(teams), 2):
+            h, a = teams[i], teams[i + 1]
+            lam = STRENGTH[h][0] * STRENGTH[a][1] * 1.25
+            mu = STRENGTH[a][0] * STRENGTH[h][1]
+            hg, ag = _poisson(rng, lam), _poisson(rng, mu)
+            hth, hta = min(hg, _poisson(rng, lam * 0.45)), min(ag, _poisson(rng, mu * 0.45))
+            ref = rng.choice(refs)
+            hs, as_ = _poisson(rng, 6 * lam + 4), _poisson(rng, 6 * mu + 3)
+            hst, ast = min(hs, _poisson(rng, 2.5 * lam + 1)), min(as_, _poisson(rng, 2.5 * mu + 1))
+            hf, af = _poisson(rng, 11), _poisson(rng, 12)
+            hc, ac = _poisson(rng, 3 + 1.5 * lam), _poisson(rng, 2.5 + 1.5 * mu)
+            hy, ay = _poisson(rng, 1.6 * ref_card[ref]), _poisson(rng, 1.9 * ref_card[ref])
+            hr, ar = int(rng.random() < 0.05), int(rng.random() < 0.06)
+            p = goal_market_probs(score_matrix(lam, mu, 0.0))
+            ph, pd, pa = p[("h2h", "home", None)], p[("h2h", "draw", None)], p[("h2h", "away", None)]
+            po = p[("totals", "over", 2.5)]
+            k = 1 + margin
+            o = lambda q: round(1 / (q * k), 2)
+            rows.append(",".join(map(str, [
+                "X1", day.strftime("%d/%m/%Y"), h, a, hg, ag, hth, hta, ref, hs, as_, hst, ast, hf, af, hc, ac,
+                hy, ay, hr, ar, o(ph), o(pd), o(pa), o(ph), o(pd), o(pa), o(po), o(1 - po), o(po), o(1 - po),
+                -0.5, o(ph), o(1 - ph)])))
+        day += timedelta(days=7)
+    return "\n".join(rows) + "\n"

@@ -102,8 +102,8 @@ class Engine:
         status = "ok"
         try:
             self._startup()
-            for step in (self.recover, self.settle_open, self.scan_and_bet, self.daily_notices,
-                         self.reliability_checks):
+            for step in (self.recover, self.settle_open, self.settle_shadow, self.scan_and_bet,
+                         self.daily_notices, self.reliability_checks):
                 try:
                     step()
                 except Exception as e:   # keep going; report the failure
@@ -422,6 +422,7 @@ class Engine:
                     continue
                 legs.extend(evaluate_event(ev, model, comp.code, self.cfg, self.now, None, rejected))
         legs = self._injury_review(legs, rejected)
+        legs = self._gate(legs, rejected)
         decision = decide(legs, self.cfg, rejected)
         self.note(f"scanned {scanned} league(s), {len(legs)} value leg(s): {decision.reason}")
         detail = json.dumps({"rejected": decision.rejected, "qualifying_legs": decision.qualifying_legs,
@@ -439,6 +440,57 @@ class Engine:
         self.store.x("INSERT INTO decisions(ts,local_date,outcome,reason,detail) VALUES(?,?,?,?,?)",
                      (iso(self.now), self.today, "BET", decision.reason, detail))
         self.place(decision.candidate)
+
+    def _gate(self, legs: list[Leg], rejected: dict) -> list[Leg]:
+        """Only markets that passed out-of-sample validation may be staked; the rest are logged as shadow."""
+        from .research.gate import allowed
+        gate = self.store.get("gate")
+        if gate is None:
+            self.notifier.queue("No validated markets yet",
+                                "The market research has not run yet, so no market is cleared for staking. "
+                                "Run the 'research' command (it also runs weekly). Opportunities are logged as shadow.",
+                                tags="hourglass", dedupe_key="gate:missing", dedupe_hours=24)
+        kept = []
+        for l in legs:
+            if allowed(gate, l.market, l.selection, l.line):
+                kept.append(l)
+                continue
+            rejected["market not validated (shadow-logged)"] = rejected.get("market not validated (shadow-logged)", 0) + 1
+            self.store.x(
+                "INSERT INTO shadow(first_seen,last_seen,local_date,event_id,sport_key,competition,home,away,kickoff,"
+                "market,selection,line,first_odds,last_odds,bookmaker,p_model,p_market,p_used,ev,reason) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_id,market,selection,line) "
+                "DO UPDATE SET last_seen=excluded.last_seen, last_odds=excluded.last_odds",
+                (iso(self.now), iso(self.now), self.today, l.event_id, l.sport_key, l.competition, l.home, l.away,
+                 l.kickoff, l.market, l.selection, l.line, l.odds, l.odds, l.bookmaker, l.p_model, l.p_market,
+                 l.p_used, l.ev, "market not validated"))
+        return kept
+
+    def settle_shadow(self):
+        """Settle shadow selections with free result sources so forward evidence accumulates."""
+        rows = self.store.q("SELECT * FROM shadow WHERE result IS NULL AND kickoff < ? ORDER BY id LIMIT 60",
+                            (iso(self.now - timedelta(hours=self.cfg.settlement_wait_hours)),))
+        for r in rows:
+            comp = COMPETITION_BY_CODE.get(r["competition"])
+            kick = parse_iso(r["kickoff"])
+            score = None
+            if comp and comp.fdorg and self.fdorg.enabled:
+                try:
+                    res = find_result(self._fdorg_results(comp, kick.date()), r["home"], r["away"], kick.date())
+                    score = (res.hg, res.ag) if res else None
+                except ProviderError as e:
+                    self.provider_error(self.fdorg.name, e)
+            if score is None:
+                if self.now - kick > timedelta(days=10):
+                    self.store.x("UPDATE shadow SET result='unsettled', settled_at=? WHERE id=?",
+                                 (iso(self.now), r["id"]))
+                continue
+            stat = None
+            if r["market"] in ("corners_totals", "cards_totals"):
+                stat = self._stat_total(r)
+            res = leg_result(r["market"], r["selection"], r["line"], score[0], score[1], stat)
+            if res:
+                self.store.x("UPDATE shadow SET result=?, settled_at=? WHERE id=?", (res, iso(self.now), r["id"]))
 
     def _extra_markets(self, sport: str, events: list[Event]) -> list[Event]:
         """BTTS / double chance (and optional corners/cards) for favorites' matches only."""

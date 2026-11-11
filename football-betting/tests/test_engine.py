@@ -32,6 +32,11 @@ class EngineTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.world = FakeWorld(date(2026, 11, 7))
+        # plumbing tests: pretend research cleared home wins (real gate comes from `research`)
+        eng = Engine(cfg(), self.dir, http=self.world, now=SAT)
+        eng.store.set("gate", {"production_allowed": [["h2h", "home", None]]})
+        eng.store.commit()
+        eng.close()
 
     def cycle(self, now, c=None):
         eng = Engine(c or cfg(), self.dir, http=self.world, now=now)
@@ -112,6 +117,22 @@ class EngineTests(unittest.TestCase):
         self.cycle(late)
         self.cycle(late + timedelta(minutes=20))
         self.assertEqual(sum(t.startswith("NO BET today") for t in self.titles()), 1)
+
+    def test_unvalidated_market_is_shadow_logged_not_staked(self):
+        eng = Engine(cfg(), self.dir, http=self.world, now=SAT)
+        eng.store.set("gate", None)
+        eng.store.x("DELETE FROM meta WHERE key='gate'")
+        eng.store.commit()
+        eng.close()
+        self.world.add_event("e1", "Alpha FC", "Lima County", SAT + timedelta(hours=4), h2h=(1.38, 5.2, 10.0))
+        out = self.cycle(SAT)
+        self.assertEqual(out["bankroll"], 1000)                  # nothing staked
+        self.assertIn("No validated markets yet", self.titles())
+        eng = Engine(cfg(), self.dir, http=self.world, now=SAT)
+        rows = eng.store.q("SELECT * FROM shadow")
+        eng.close()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market"], "h2h")
 
     def test_live_mode_refuses_without_adapter(self):
         self.world.add_event("e1", "Alpha FC", "Lima County", SAT + timedelta(hours=4), h2h=(1.38, 5.2, 10.0))

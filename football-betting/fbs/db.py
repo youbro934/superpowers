@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS legs (
 CREATE TABLE IF NOT EXISTS decisions (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, local_date TEXT NOT NULL, outcome TEXT NOT NULL,
   reason TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS shadow (
+  id INTEGER PRIMARY KEY, first_seen TEXT NOT NULL, last_seen TEXT, local_date TEXT, event_id TEXT NOT NULL,
+  sport_key TEXT, competition TEXT, home TEXT, away TEXT, kickoff TEXT, market TEXT NOT NULL,
+  selection TEXT NOT NULL, line REAL, first_odds REAL, last_odds REAL, bookmaker TEXT, p_model REAL,
+  p_market REAL, p_used REAL, ev REAL, reason TEXT, result TEXT, settled_at TEXT,
+  UNIQUE(event_id, market, selection, line));
 CREATE TABLE IF NOT EXISTS ratings (competition TEXT PRIMARY KEY, fitted_at TEXT, model TEXT);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, dedupe_key TEXT, title TEXT, body TEXT,

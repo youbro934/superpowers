@@ -4,7 +4,8 @@
   status              print bankroll, state and open bets
   continue CONTINUE   resume after the EUR 500 stop (the word must be exact)
   settle LEG_ID void|won|lost   manual settlement for a postponed/unsettleable selection
-  backtest [DAYS]     walk-forward backtest on historical closing odds
+  backtest [DAYS]     walk-forward backtest on historical closing odds (goal model only)
+  research [MONTHS]   per-market chronological backtests + promotion gate (needs numpy)
   notify-test         send a test push notification
 """
 from __future__ import annotations
@@ -103,6 +104,8 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         eng.notifier.flush()
         store.commit()
         return 0
+    if cmd == "research":
+        return _research(eng, args)
     if cmd == "notify-test":
         eng.notifier.queue("Test notification", "If you can read this on your iPhone, push alerts work.",
                            tags="bell")
@@ -113,6 +116,41 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         return 0 if sent else 1
     print(__doc__)
     return 2
+
+
+def _research(eng: Engine, args: list[str]) -> int:
+    """Per-market chronological backtests + promotion gate (needs numpy)."""
+    from .research.backtest import Research
+    from .research.data import ResearchData
+    from .research.gate import evaluate_gate
+    from .research.report import render
+    months = int(args[0]) if args else 24
+    data = ResearchData(os.path.join(eng.cache_dir, "research"))
+    report = Research(data, utcnow().date(), seasons=4, test_months=months).run()
+    gate = evaluate_gate(report)
+    with open(os.path.join(eng.dir, "research.json"), "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=1, default=str)
+    with open(os.path.join(eng.dir, "gate.json"), "w", encoding="utf-8") as f:
+        json.dump(gate, f, indent=1)
+    with open(os.path.join(eng.dir, "research.html"), "w", encoding="utf-8") as f:
+        f.write(render(report, gate))
+    eng.store.set("gate", gate)
+    counts = {}
+    for fam, g in gate["markets"].items():
+        counts.setdefault(g["status"], []).append(fam)
+    text = "; ".join(f"{k}: {', '.join(sorted(v))}" for k, v in sorted(counts.items()))
+    print(text)
+    eng.notifier.queue("Market research finished", f"{report['test_period']}\n{text}\n"
+                       "Only PASSED markets can be used by the paper bankroll.", tags="bar_chart")
+    if not counts.get("PASSED"):
+        eng.notifier.queue("Model reliability: no market validated",
+                           "No market showed a statistically reliable edge at historical prices. "
+                           "The bankroll stays in NO BET; shadow markets are tracked forward without stakes.",
+                           priority="high", tags="warning", dedupe_key="gate:none", dedupe_hours=24 * 6)
+    eng.store.commit()
+    eng.notifier.flush()
+    eng.store.commit()
+    return 0
 
 
 if __name__ == "__main__":
