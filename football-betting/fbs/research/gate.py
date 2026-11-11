@@ -62,12 +62,15 @@ def evaluate_gate(report: dict) -> dict:
             if ok:
                 passed.append((sel, line, model))
         priced = fam in HIST_PRICED
-        if not priced:
-            for skey, s in sels.items():
-                f2, sel, line, (model,) = _parse_key(skey)
-                skill = s.get("skill_vs_base_rate")
-                if s.get("n", 0) >= MIN_SHADOW_N and s.get("ece", 1) <= MAX_ECE and skill is not None and skill > 0:
-                    shadow.append((sel, line, model))
+        # selection-level: a selection never priced historically (scored against the base rate,
+        # e.g. over 0.5 goals when only 2.5 has prices) can earn SHADOW; a priced one cannot
+        for skey, s in sels.items():
+            f2, sel, line, (model,) = _parse_key(skey)
+            if s.get("reference") != "base_rate":
+                continue
+            skill = s.get("skill_vs_base_rate")
+            if s.get("n", 0) >= MIN_SHADOW_N and s.get("ece", 1) <= MAX_ECE and skill is not None and skill > 0:
+                shadow.append((sel, line, model))
         if passed:
             status, reason = "PASSED", f"{len(passed)} selection(s) cleared every bar"
         elif shadow:

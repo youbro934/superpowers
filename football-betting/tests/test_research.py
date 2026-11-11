@@ -114,6 +114,22 @@ class LeagueLevelTests(unittest.TestCase):
             self.assertLess(abs(lv[f"{lg}|fouls"]["bias"]), 0.04, lv[f"{lg}|fouls"])
 
 
+class GateSelectionTests(unittest.TestCase):
+    def test_unpriced_line_can_shadow_while_priced_line_rejected(self):
+        from fbs.research.gate import selection_status
+        good = {"n": 900, "ece": 0.01, "skill_vs_base_rate": 0.02, "reference": "base_rate"}
+        rep = {"markets": {"goals_total": {
+            "selections": {"goals_total:over@0.5|glm": good,
+                           "goals_total:over@2.5|glm": {"n": 900, "ece": 0.01, "reference": "market",
+                                                        "skill_vs_market": -0.01}},
+            "bets": {"goals_total:over@2.5|glm|all": {"n": 900, "roi": -0.05, "roi_ci95": [-0.09, -0.01],
+                                                      "clv_mean": -0.04, "clv_ci95": [-0.05, -0.03]}}}}}
+        gate = evaluate_gate(rep)
+        self.assertEqual(selection_status(gate, "goals_total", "over", 0.5, "glm"), "SHADOW")
+        self.assertEqual(selection_status(gate, "goals_total", "over", 2.5, "glm"), "REJECTED")
+        self.assertEqual(selection_status(gate, "goals_total", "over", 1.5, "glm"), "REJECTED")  # untested line
+
+
 class ArchiveTests(unittest.TestCase):
     def test_archive_matches_and_prices(self):
         import gzip, json
