@@ -100,8 +100,8 @@ const eur = c => (c < 0 ? "-€" : "€") + (Math.abs(c) / 100).toFixed(2);
 const pct = x => x == null ? "—" : (x * 100).toFixed(1) + "%";
 const BET365 = "https://www.bet365.com/";
 let S = null, tab = "home";
-const cfg = () => { try { return JSON.parse(localStorage.getItem("fbs-cfg") || "{}"); } catch { return {}; } };
-const saveCfg = c => { try { localStorage.setItem("fbs-cfg", JSON.stringify(c)); } catch {} };
+// Security: this app holds no credentials. Any settings an older version stored are erased.
+try { localStorage.removeItem("fbs-cfg"); } catch {}
 const t = iso => iso ? new Date(iso).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}) : "—";
 const tm = iso => iso ? new Date(iso).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : "—";
 function toast(m, ms = 3500){ const e = $("#toast"); e.textContent = m; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", ms); }
@@ -109,7 +109,7 @@ function title(s){ return String(s || "").replace(/\b\w/g, c => c.toUpperCase())
 
 async function load(){
   try {
-    const r = await fetch("../state.json?ts=" + Date.now(), {cache: "no-store"});
+    const r = await fetch("state.json?ts=" + Date.now(), {cache: "no-store", credentials: "same-origin"});
     if (!r.ok) throw new Error("HTTP " + r.status);
     S = await r.json();
     render();
@@ -118,18 +118,17 @@ async function load(){
   }
 }
 
-async function command(command, payload){
-  const c = cfg();
-  if (!c.token || !c.owner || !c.repo) { toast("Add your GitHub token in Settings first"); show("settings"); return false; }
-  const inputs = {command};
-  if (command === "continue") inputs.confirm = payload;
-  else if (payload) inputs.payload = JSON.stringify(payload);
-  const r = await fetch(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/actions/workflows/football-betting.yml/dispatches`, {
-    method: "POST", headers: {"Authorization": "Bearer " + c.token, "Accept": "application/vnd.github+json"},
-    body: JSON.stringify({ref: c.ref || "main", inputs})});
-  if (r.status === 204) { toast("Sent. The cloud applies it in about 1–2 minutes."); pollFor(120); return true; }
-  toast("Command failed: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (check token)" : ""), 6000);
-  return false;
+// Commands are GitHub issues the owner submits while signed in to GitHub. The server checks the author
+// is the repository owner and the repository is private; this page never sees a token.
+function command(command, payload){
+  if (!S || !S.repo) { toast("Repository unknown: wait for the first cloud update"); return false; }
+  const body = "Command from the Football Bets app. Submit this issue to run it; the cloud replies here and closes it.\n\n" +
+    "```json\n" + JSON.stringify(Object.assign({command}, payload || {})) + "\n```\n";
+  const url = `https://github.com/${S.repo}/issues/new?title=${encodeURIComponent("FBS " + command + (payload && payload.id ? " " + payload.id : ""))}&body=${encodeURIComponent(body)}`;
+  window.open(url, "_blank", "noopener");
+  toast("GitHub opened: tap 'Submit new issue'. The cloud applies it in about 1–2 minutes.", 6000);
+  pollFor(180);
+  return true;
 }
 function pollFor(sec){ let n = 0; const i = setInterval(() => { load(); if ((n += 15) >= sec) clearInterval(i); }, 15000); }
 
@@ -226,16 +225,12 @@ function render(){
 }
 
 function renderSettings(){
-  const c = cfg();
-  $("#tab-settings").innerHTML = `<div class="card">
-    <b>Cloud control</b><div class="sub">Commands run as GitHub Actions in your repository. The token stays on this iPhone only.</div>
-    <label>GitHub owner</label><input id="sOwner" value="${esc(c.owner || "youbro934")}" autocapitalize="off">
-    <label>Repository</label><input id="sRepo" value="${esc(c.repo || "superpowers")}" autocapitalize="off">
-    <label>Branch</label><input id="sRef" value="${esc(c.ref || "main")}" autocapitalize="off">
-    <label>Fine-grained token (Actions: read and write, this repository only)</label><input id="sToken" type="password" value="${esc(c.token || "")}" autocomplete="off">
-    <button class="primary full" style="margin-top:12px" id="sSave">Save</button></div>
-    <div class="card"><b>Push notifications</b><div class="sub">Install the free <b>ntfy</b> app and subscribe to your private topic (the NTFY_TOPIC secret).
-    Alerts arrive even when this app is closed; tapping one opens the matching card here.</div>
+  $("#tab-settings").innerHTML = `<div class="card"><b>How commands work</b><div class="sub" style="margin-top:6px">
+    START, STOP, CONTINUE, Decline and "I placed this bet" open a pre-filled GitHub issue in <b>${esc(S && S.repo || "your repository")}</b>.
+    Submit it while signed in to GitHub. The cloud accepts it only from the repository owner, only in a private
+    repository, and only for allowed commands. It replies on the issue and closes it. This app stores no passwords or tokens.</div></div>
+    <div class="card"><b>Push notifications</b><div class="sub">Install the free <b>ntfy</b> app and subscribe to your private topic.
+    Pushes carry only the event ("New opportunity", "Bet won"); amounts and selections stay in this protected app.</div>
     <button class="secondary full" style="margin-top:10px" id="sTest">Send test notification</button></div>`;
 }
 
@@ -243,8 +238,7 @@ function bind(){
   const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
   on("btnStart", () => command("start"));
   on("btnStop", () => { if (confirm("Stop issuing opportunities? Open bets keep being tracked.")) command("stop"); });
-  on("btnContinue", () => { if (prompt('Type CONTINUE to resume after the €500 stop') === "CONTINUE") command("continue", "CONTINUE"); });
-  on("sSave", () => { saveCfg({owner: $("#sOwner").value.trim(), repo: $("#sRepo").value.trim(), ref: $("#sRef").value.trim() || "main", token: $("#sToken").value.trim()}); toast("Saved on this device"); });
+  on("btnContinue", () => { if (prompt('Type CONTINUE to resume after the €500 stop') === "CONTINUE") command("continue", {confirm: "CONTINUE"}); });
   on("sTest", () => command("notify-test"));
   document.querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
     const o = S.opportunities.find(x => x.id === b.dataset.copy);
@@ -261,7 +255,7 @@ function bind(){
     $("#cSend").onclick = async () => {
       const stake = parseFloat($("#cStake").value.replace(",", ".")), odds = parseFloat($("#cOdds").value.replace(",", "."));
       if (!(stake > 0) || !(odds > 1)) { toast("Enter the stake and the odds Bet365 accepted"); return; }
-      if (await command("confirm", {id: o.id, stake, odds, bookmaker: "Bet365", reference: $("#cRef").value.trim(), placed_at: new Date().toISOString()})) d.close();
+      if (command("confirm", {id: o.id, stake, odds, reference: $("#cRef").value.trim()})) d.close();
     };
   });
 }

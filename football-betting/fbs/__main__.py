@@ -145,6 +145,10 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         return _finish(eng, f"bet {bet['id']} settled manually as {res}")
     if cmd == "research":
         return _research(eng, args)
+    if cmd == "issue-command":
+        return _issue_command(eng)
+    if cmd == "verify-apif":
+        return _verify_apif(eng)
     if cmd == "notify-test":
         eng.notifier.queue("Test notification", "If you can read this on your iPhone, push alerts work.",
                            tags="bell")
@@ -155,6 +159,82 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         return 0 if sent else 1
     print(__doc__)
     return 2
+
+
+def _issue_command(eng: Engine) -> int:
+    """Owner command from a GitHub issue. Everything arrives via environment variables."""
+    from .commands import CommandError, authorize, parse
+    env = os.environ
+    result_path = env.get("FBS_RESULT_FILE", "command-result.txt")
+    try:
+        authorize(env.get("REPO_PRIVATE", ""), env.get("ISSUE_AUTHOR", ""), env.get("REPO_OWNER", ""),
+                  env.get("ISSUE_ASSOCIATION", ""))
+        cmd, payload = parse(env.get("ISSUE_BODY", ""))
+    except CommandError as e:
+        with open(result_path, "w", encoding="utf-8") as f:
+            f.write(f"Not executed: {e}")
+        print(f"refused: {e}")
+        return 0
+    if cmd == "continue":
+        args = [payload["confirm"]]
+    elif cmd in ("confirm", "reject", "settle-bet"):
+        args = [json.dumps(payload)]
+    else:
+        args = []
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        code = _dispatch(eng, cmd, args)
+    out = buf.getvalue().strip().splitlines()
+    with open(result_path, "w", encoding="utf-8") as f:
+        f.write(f"`{cmd}` processed: {out[-1] if out else 'done'}")
+    print(f"{cmd}: {out[-1] if out else 'done'}")
+    return 0 if code in (0, 1) else code
+
+
+def _verify_apif(eng: Engine) -> int:
+    """Check the real API-Football account: plan, quota, and whether current fixtures/odds are served."""
+    from .util import ProviderError, http_request
+    key = eng.cfg.api_football_key
+    if not key:
+        print("API_FOOTBALL_KEY not set")
+        return 1
+    hdr = {"x-apisports-key": key}
+    report = {}
+    try:
+        st = http_request("https://v3.football.api-sports.io/status", headers=hdr, provider="api-football").json()
+        r = st.get("response") or {}
+        report["account_plan"] = (r.get("subscription") or {}).get("plan")
+        report["requests_today"] = (r.get("requests") or {}).get("current")
+        report["requests_limit_day"] = (r.get("requests") or {}).get("limit_day")
+        report["status_errors"] = st.get("errors")
+        day = utcnow().date().isoformat()
+        fx = http_request("https://v3.football.api-sports.io/fixtures", params={"date": day}, headers=hdr,
+                          provider="api-football").json()
+        report["fixtures_errors"] = fx.get("errors")
+        resp = fx.get("response") or []
+        from .research.collector import PRIORITY_LEAGUES
+        pri = [f for f in resp if (f.get("league") or {}).get("id") in PRIORITY_LEAGUES]
+        report["fixtures_today_total"] = len(resp)
+        report["fixtures_today_priority"] = len(pri)
+        report["seasons_seen"] = sorted({(f.get("league") or {}).get("season") for f in pri if f.get("league")})
+        if pri:
+            f0 = pri[0]
+            od = http_request("https://v3.football.api-sports.io/odds", params={
+                "fixture": f0["fixture"]["id"]}, headers=hdr, provider="api-football").json()
+            report["odds_errors"] = od.get("errors")
+            books = (od.get("response") or [{}])[0].get("bookmakers", []) if od.get("response") else []
+            report["odds_bookmakers"] = len(books)
+            report["odds_bet_names"] = sorted({b.get("name") for bk in books for b in bk.get("bets", [])})[:40]
+    except ProviderError as e:
+        report["error"] = str(e)
+    with open(os.path.join(eng.dir, "apif-verification.json"), "w", encoding="utf-8") as f:
+        json.dump(report | {"checked_at": iso(utcnow())}, f, indent=1)
+    print(json.dumps({k: v for k, v in report.items() if k != "odds_bet_names"}))
+    eng.store.set("apif_verification", report | {"checked_at": iso(utcnow())})
+    eng.store.commit()
+    return 0
 
 
 def _finish(eng: Engine, msg: str, code: int = 0) -> int:

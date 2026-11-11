@@ -20,22 +20,23 @@ Runs every hour on GitHub Actions, on GitHub's servers, so your computer doesn't
 
 ## iPhone app (manual betting flow)
 
-The cloud engine finds an entry and the phone gets a push notification. Open the card, then open Bet365 and place the bet
-**yourself**, then tap **I placed this bet** and enter the stake and odds Bet365 accepted. Results settle automatically and
-the bankroll updates. The system never places or submits a bet, never logs in to Bet365 and stores no Bet365 credentials.
-Opening Bet365 is not treated as placing a bet.
+The cloud engine finds an entry and the phone gets a push. Open the card, then open Bet365 and place the bet **yourself**,
+then tap **I placed this bet** and submit the pre-filled GitHub issue with the stake and odds Bet365 accepted. Results
+settle automatically and the bankroll updates. Nothing is ever placed automatically and no Bet365 credentials are stored.
+There is no public bet-slip deep link, so the card opens Bet365 and offers **Copy selections**. See `SECURITY.md`.
 
-* App: `https://<owner>.github.io/<repo>/app/`. It is a PWA served by GitHub Pages from the `fbs-data` branch.
-* Commands (START/STOP, CONTINUE, confirm, decline) are sent from the app as GitHub `workflow_dispatch` runs.
-  They need a fine-grained token stored only on the phone, scoped to **this repository** with **Actions: Read and write**.
-  A command takes effect in about 1–2 minutes.
-* Push notifications come through the free **ntfy** app and arrive even when the PWA is closed. Tapping one opens the matching card.
-* **Bet365:** there is no public, documented deep link that pre-fills a bet slip with third-party selections, so the card
-  opens Bet365 and offers **Copy selections** for manual entry.
+**Requirements:** a **private** repository (the engine refuses to run in a public one), and Cloudflare Pages behind
+Cloudflare Access to host the app.
 
-**Install on iPhone:** Safari → open the app URL → Share → **Add to Home Screen**. Then open it from the Home Screen →
-Settings → enter the owner, repository, branch (`main`) and token → Save. Install **ntfy**, subscribe to your
-`NTFY_TOPIC`, and tap *Send test notification* in the app.
+**Set-up (owner):**
+1. Create a private repository and push this code with the `fbs-data` branch. (A fork of a public repository cannot be made private.)
+2. Add secrets: `API_FOOTBALL_KEY`, `NTFY_TOPIC` (optional: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`, `FOOTBALL_DATA_ORG_KEY`, `ODDS_API_KEY`).
+3. Cloudflare (free): create a Pages project `football-bets`, then Zero Trust → Access → an application covering
+   `football-bets.pages.dev` and its preview URLs, allowing only your email (one-time code).
+   Add secrets `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID`, then set the variables
+   `FBS_ACCESS_PROTECTED=true` and `FBS_APP_URL=https://football-bets.pages.dev/`.
+4. Actions tab → enable workflows. Run `verify-apif` once to confirm what your API-Football plan returns.
+5. iPhone: Safari → app URL → sign in with the email code → Share → **Add to Home Screen**. Install **ntfy** and subscribe to the topic.
 
 ## Multi-market research and the promotion gate
 

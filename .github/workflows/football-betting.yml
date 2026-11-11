@@ -3,6 +3,15 @@ name: Football Betting System
 # Hourly autonomous cycle. State (ledger, bets, decisions) lives on the
 # `fbs-data` branch as a text SQL dump plus a static dashboard (index.html).
 # Scheduled runs only fire from the repository's default branch.
+#
+# Security:
+# * Nothing runs against betting data unless the repository is PRIVATE
+#   (checked through the API in the `guard` job; a public repo would expose
+#   state, logs and command issues).
+# * Owner commands arrive as issues titled "FBS ...", are accepted only from
+#   the repository owner, parsed as data (never interpolated into a shell)
+#   and answered on the issue. No token is ever handed to a client.
+# * All keys are GitHub secrets, used only inside this job.
 
 on:
   schedule:
@@ -15,7 +24,7 @@ on:
         required: true
         default: run
         type: choice
-        options: [run, status, continue, backtest, research, notify-test, start, stop, confirm, reject, settle-bet]
+        options: [run, status, continue, backtest, research, notify-test, verify-apif, start, stop, confirm, reject, settle-bet]
       confirm:
         description: "For 'continue' type exactly: CONTINUE"
         required: false
@@ -24,11 +33,14 @@ on:
         description: "JSON for confirm / reject / settle-bet (sent by the iPhone app)"
         required: false
         default: ""
+  issues:
+    types: [opened]
   push:
     paths: ["football-betting/**", ".github/workflows/football-betting.yml"]
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   test:
@@ -45,8 +57,25 @@ jobs:
         working-directory: football-betting
         run: python -m unittest discover -s tests -t . -v
 
+  guard:
+    if: github.event_name != 'push' && (github.event_name != 'issues' || startsWith(github.event.issue.title, 'FBS '))
+    runs-on: ubuntu-latest
+    outputs:
+      private: ${{ steps.check.outputs.private }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)
+          echo "private=$private" >> "$GITHUB_OUTPUT"
+          if [ "$private" != "true" ]; then
+            echo "::warning::Repository is public: the betting engine and commands are disabled to avoid exposing data."
+          fi
+
   cycle:
-    if: github.event_name != 'push'
+    needs: guard
+    if: needs.guard.outputs.private == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     # one cycle at a time, never cancelled midway: no overlapping bets, no lost state
@@ -63,7 +92,10 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
       FBS_EXECUTION_MODE: ${{ vars.FBS_EXECUTION_MODE || 'manual' }}
-      FBS_APP_URL: ${{ vars.FBS_APP_URL || format('https://{0}.github.io/{1}/app/', github.repository_owner, github.event.repository.name) }}
+      FBS_APP_URL: ${{ vars.FBS_APP_URL }}
+      FBS_PUSH_DETAIL: ${{ vars.FBS_PUSH_DETAIL || 'minimal' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       FBS_ALLOWED_BOOKMAKERS: ${{ vars.FBS_ALLOWED_BOOKMAKERS }}
       FBS_DASHBOARD_URL: ${{ vars.FBS_DASHBOARD_URL }}
       FBS_DATA_DIR: ${{ github.workspace }}/state
@@ -99,9 +131,16 @@ jobs:
       - name: Run command
         working-directory: football-betting
         env:
-          CMD: ${{ github.event.schedule == '43 3 * * 1' && 'research' || github.event.inputs.command || 'run' }}
+          CMD: ${{ github.event_name == 'issues' && 'issue-command' || github.event.schedule == '43 3 * * 1' && 'research' || github.event.inputs.command || 'run' }}
           CONFIRM: ${{ github.event.inputs.confirm }}
           PAYLOAD: ${{ github.event.inputs.payload }}
+          # issue fields reach Python only as environment data
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_ASSOCIATION: ${{ github.event.issue.author_association }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_PRIVATE: ${{ needs.guard.outputs.private }}
+          FBS_RESULT_FILE: ${{ github.workspace }}/command-result.txt
         run: |
           case "$CMD" in
             continue) python -m fbs continue "$CONFIRM" ;;
@@ -111,12 +150,15 @@ jobs:
             *) python -m fbs "$CMD" ;;
           esac
 
-      - name: Publish the iPhone app next to the state
-        if: always()
+      - name: Deploy the app to Cloudflare Pages (only behind Cloudflare Access)
+        # FBS_ACCESS_PROTECTED must be set to 'true' by the owner only after an Access policy
+        # protects the whole Pages project; without it nothing is published anywhere.
+        if: always() && env.CLOUDFLARE_API_TOKEN != '' && vars.FBS_ACCESS_PROTECTED == 'true'
         run: |
-          mkdir -p state/app
-          cp football-betting/pwa/* state/app/
-          touch state/.nojekyll
+          mkdir -p site
+          cp football-betting/pwa/* site/
+          cp state/state.json site/
+          npx --yes wrangler@3.114.0 pages deploy site --project-name "${{ vars.FBS_CF_PROJECT || 'football-bets' }}" --branch main --commit-dirty=true
 
       - name: Save provider cache
         if: always()
@@ -131,12 +173,22 @@ jobs:
         run: |
           git add -A
           if git diff --cached --quiet; then echo "no state change"; exit 0; fi
-          git commit -q -m "state: ${{ github.event.inputs.command || 'run' }} $(date -u +%Y-%m-%dT%H:%MZ)"
+          git commit -q -m "state: ${{ github.event_name == 'issues' && 'command' || github.event.inputs.command || 'run' }} $(date -u +%Y-%m-%dT%H:%MZ)"
           for i in 1 2 3 4; do
             git push origin fbs-data && exit 0
             sleep $((2 ** i))
           done
           echo "push failed" && exit 1
+
+      - name: Reply on the command issue
+        if: always() && github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+        run: |
+          [ -f command-result.txt ] || echo "Not executed: the run failed before the command was processed." > command-result.txt
+          gh issue comment "$N" --repo "$GITHUB_REPOSITORY" --body-file command-result.txt
+          gh issue close "$N" --repo "$GITHUB_REPOSITORY"
 
       - name: Alert on failure
         if: failure() && env.NTFY_TOPIC != ''

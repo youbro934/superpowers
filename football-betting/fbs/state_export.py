@@ -32,6 +32,7 @@ def write_state(e) -> str:
     last_run = s.one("SELECT * FROM runs ORDER BY id DESC LIMIT 1")
     state = {
         "generated_at": iso(e.now),
+        "repo": os.environ.get("GITHUB_REPOSITORY", ""),
         "mode": e.cfg.execution_mode,
         "ai_enabled": e.ai_enabled,
         "status": bank.status,

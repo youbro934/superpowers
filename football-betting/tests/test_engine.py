@@ -24,6 +24,7 @@ def cfg(**kw):
     c.ntfy_topic = "test-topic"
     c.min_bet_edge = 0.02               # plumbing test, not a threshold test
     c.execution_mode = "paper"          # these tests cover the simulated-placement mode
+    c.push_detail = "full"              # they assert on push content
     for k, v in kw.items():
         setattr(c, k, v)
     return c
@@ -134,6 +135,14 @@ class EngineTests(unittest.TestCase):
         eng.close()
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["market"], "h2h")
+
+    def test_minimal_push_leaks_no_amounts(self):
+        self.world.add_event("e1", "Alpha FC", "Lima County", SAT + timedelta(hours=4), h2h=(1.38, 5.2, 10.0))
+        self.cycle(SAT, cfg(push_detail="minimal"))
+        bet = [p for p in self.world.pushes if p["title"].startswith("PAPER BET")][0]
+        self.assertNotIn("€", bet["title"] + bet["body"])
+        self.assertNotIn("Alpha", bet["body"])
+        self.assertEqual(bet["body"], "Open the app for details.")
 
     def test_live_mode_refuses_without_adapter(self):
         self.world.add_event("e1", "Alpha FC", "Lima County", SAT + timedelta(hours=4), h2h=(1.38, 5.2, 10.0))

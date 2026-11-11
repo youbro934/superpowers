@@ -137,6 +137,7 @@ class Settings:
     healthcheck_url: str = ""
     dashboard_url: str = ""
     app_url: str = ""
+    push_detail: str = "minimal"     # minimal: no amounts/selections leave the server in pushes
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -167,4 +168,5 @@ class Settings:
         s.healthcheck_url = _env("HEALTHCHECK_URL")
         s.dashboard_url = _env("FBS_DASHBOARD_URL")
         s.app_url = _env("FBS_APP_URL")
+        s.push_detail = _env("FBS_PUSH_DETAIL", "minimal").lower() or "minimal"
         return s

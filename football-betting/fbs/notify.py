@@ -74,10 +74,21 @@ class Notifier:
                 failed += 1
         return sent, failed
 
+    def _content(self, n) -> tuple[str, str]:
+        """Minimal mode: the push says what happened, the protected app holds the details."""
+        if self.cfg.push_detail == "full":
+            return n["title"], n["body"]
+        title = n["title"]
+        for sep in (" @ ", ":", " | ", " +", " -€", " (", " €"):
+            if sep in title:
+                title = title.split(sep)[0]
+        return title.strip(), "Open the app for details."
+
     def _ntfy(self, n):
         # JSON publishing keeps UTF-8 (e.g. the euro sign) intact in titles
         prio = {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}.get(n["priority"] or "default", 3)
-        msg = {"topic": self.cfg.ntfy_topic, "title": n["title"], "message": n["body"], "priority": prio}
+        title, body = self._content(n)
+        msg = {"topic": self.cfg.ntfy_topic, "title": title, "message": body, "priority": prio}
         if n["tags"]:
             msg["tags"] = [t for t in n["tags"].split(",") if t]
         extra = json.loads(n["extra"]) if "extra" in n.keys() and n["extra"] else {}
@@ -92,7 +103,7 @@ class Notifier:
                   headers=headers, provider="ntfy", retries=2)
 
     def _telegram(self, n):
-        payload = json.dumps({"chat_id": self.cfg.telegram_chat_id,
-                              "text": f"{n['title']}\n\n{n['body']}"}).encode()
+        title, body = self._content(n)
+        payload = json.dumps({"chat_id": self.cfg.telegram_chat_id, "text": f"{title}\n\n{body}"}).encode()
         self.http(f"https://api.telegram.org/bot{self.cfg.telegram_bot_token}/sendMessage", method="POST",
                   data=payload, headers={"Content-Type": "application/json"}, provider="telegram", retries=2)
