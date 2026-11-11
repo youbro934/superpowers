@@ -1,0 +1,592 @@
+{
+ "generated": "2026-11-11T18:20:28.584208+00:00",
+ "test_period": "2024-11-21..2026-11-11",
+ "rules": {
+  "min_bets": 300,
+  "max_ece": 0.03,
+  "min_shadow_n": 500
+ },
+ "markets": {
+  "result": {
+   "status": "REJECTED",
+   "reason": "no selection showed a statistically reliable edge at historical prices",
+   "passed": [],
+   "shadow": [],
+   "evidence": [
+    "result:home|glm|all: n=2243 roi=-0.107 ci=[-0.173,-0.042] clv=-0.05779757771212773 ece=0.018155930504496598",
+    "result:draw|dc|all: n=1783 roi=-0.075 ci=[-0.159,+0.009] clv=-0.049751808772235534 ece=0.004703942761838988",
+    "result:away|glm|all: n=3537 roi=-0.124 ci=[-0.185,-0.064] clv=-0.06402142504935329 ece=0.01410757213793216",
+    "result:away|dc|all: n=2866 roi=-0.132 ci=[-0.199,-0.066] clv=-0.065174109544303 ece=0.009233146736177152",
+    "result:home|dc|all: n=2250 roi=-0.141 ci=[-0.202,-0.081] clv=-0.0626583288451274 ece=0.005706652501243019",
+    "result:draw|glm|all: n=1505 roi=-0.038 ci=[-0.136,+0.061] clv=-0.047331804112733834 ece=0.013394861249102075"
+   ]
+  },
+  "double_chance": {
+   "status": "REJECTED",
+   "reason": "no selection showed a statistically reliable edge at historical prices",
+   "passed": [],
+   "shadow": [],
+   "evidence": [
+    "double_chance:X2|dc|all: n=2074 roi=-0.089 ci=[-0.137,-0.042] clv=-0.06366097109398128 ece=0.005706652501243472",
+    "double_chance:X2|glm|all: n=2306 roi=-0.092 ci=[-0.138,-0.045] clv=-0.06287106972497762 ece=0.018155930504496296",
+    "double_chance:1X|dc|all: n=1291 roi=-0.115 ci=[-0.166,-0.064] clv=-0.058945005018842145 ece=0.009233146736175913",
+    "double_chance:1X|glm|all: n=1218 roi=-0.083 ci=[-0.140,-0.026] clv=-0.05606995598848978 ece=0.014107572137932527"
+   ]
+  },
+  "btts": {
+   "status": "REJECTED",
+   "reason": "no historical prices and the model did not beat the base rate reliably",
+   "passed": [],
+   "shadow": [],
+   "evidence": []
+  },
+  "goals_total": {
+   "status": "REJECTED",
+   "reason": "no selection showed a statistically reliable edge at historical prices",
+   "passed": [],
+   "shadow": [],
+   "evidence": [
+    "goals_total:over@2.5|dc|all: n=1844 roi=-0.008 ci=[-0.052,+0.035] clv=-0.04856720010746352 ece=0.03741415113250062",
+    "goals_total:under@2.5|glm|all: n=3602 roi=-0.057 ci=[-0.093,-0.021] clv=-0.04651220896192992 ece=0.03975191178850445",
+    "goals_total:under@2.5|dc|all: n=2843 roi=-0.049 ci=[-0.088,-0.010] clv=-0.050620329481474206 ece=0.037414151132500705",
+    "goals_total:over@2.5|glm|all: n=1805 roi=+0.000 ci=[-0.046,+0.047] clv=-0.04330257029421499 ece=0.0397519117885045"
+   ]
+  },
+  "team_goals": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 24 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     0.5,
+     "dc"
+    ],
+    [
+     "home_under",
+     0.5,
+     "dc"
+    ],
+    [
+     "home_over",
+     1.5,
+     "dc"
+    ],
+    [
+     "home_under",
+     1.5,
+     "dc"
+    ],
+    [
+     "home_over",
+     2.5,
+     "dc"
+    ],
+    [
+     "home_under",
+     2.5,
+     "dc"
+    ],
+    [
+     "away_over",
+     0.5,
+     "dc"
+    ],
+    [
+     "away_under",
+     0.5,
+     "dc"
+    ],
+    [
+     "away_over",
+     1.5,
+     "dc"
+    ],
+    [
+     "away_under",
+     1.5,
+     "dc"
+    ],
+    [
+     "away_over",
+     2.5,
+     "dc"
+    ],
+    [
+     "away_under",
+     2.5,
+     "dc"
+    ],
+    [
+     "home_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     2.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "ht_goals_total": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 4 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "over",
+     0.5,
+     "glm"
+    ],
+    [
+     "under",
+     0.5,
+     "glm"
+    ],
+    [
+     "over",
+     1.5,
+     "glm"
+    ],
+    [
+     "under",
+     1.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "ht_team_goals": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 4 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     0.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "corners_total": {
+   "status": "REJECTED",
+   "reason": "no historical prices and the model did not beat the base rate reliably",
+   "passed": [],
+   "shadow": [],
+   "evidence": []
+  },
+  "team_corners": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 20 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     2.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     3.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     4.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     4.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     5.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     5.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     6.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     6.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     3.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     4.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     4.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     5.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     5.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     6.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     6.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "fouls_total": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 6 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "over",
+     18.5,
+     "glm"
+    ],
+    [
+     "under",
+     18.5,
+     "glm"
+    ],
+    [
+     "over",
+     20.5,
+     "glm"
+    ],
+    [
+     "under",
+     20.5,
+     "glm"
+    ],
+    [
+     "over",
+     22.5,
+     "glm"
+    ],
+    [
+     "under",
+     22.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "team_fouls": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 22 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     8.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     8.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     9.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     9.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     10.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     10.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     11.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     11.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     12.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     12.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     8.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     8.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     9.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     9.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     10.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     10.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     11.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     11.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     12.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     12.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     13.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     13.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "yellows_total": {
+   "status": "REJECTED",
+   "reason": "no historical prices and the model did not beat the base rate reliably",
+   "passed": [],
+   "shadow": [],
+   "evidence": []
+  },
+  "team_yellows": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 8 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     2.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "red_card": {
+   "status": "REJECTED",
+   "reason": "no historical prices and the model did not beat the base rate reliably",
+   "passed": [],
+   "shadow": [],
+   "evidence": []
+  },
+  "cards_total": {
+   "status": "REJECTED",
+   "reason": "no historical prices and the model did not beat the base rate reliably",
+   "passed": [],
+   "shadow": [],
+   "evidence": []
+  },
+  "asian_handicap": {
+   "status": "REJECTED",
+   "reason": "no selection showed a statistically reliable edge at historical prices",
+   "passed": [],
+   "shadow": [],
+   "evidence": [
+    "asian_handicap:away|dc|all: n=2958 roi=-0.027 ci=[-0.058,+0.005] clv=-0.0372395228807428 ece=None",
+    "asian_handicap:home|dc|all: n=2507 roi=-0.051 ci=[-0.085,-0.017] clv=-0.037494279915536305 ece=None"
+   ]
+  }
+ },
+ "production_allowed": [],
+ "production_shadow": []
+}
