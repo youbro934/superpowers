@@ -1,0 +1,2 @@
+id,ts,kind,amount_cents,balance_cents,bet_id,note
+1,2026-11-11T17:36:38Z,DEPOSIT,1000,1000,,initial bankroll (the only deposit ever allowed)

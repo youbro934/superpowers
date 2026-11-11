@@ -44,6 +44,7 @@ Only PASSED markets can be used by the paper bankroll.','default','bar_chart',0,
 INSERT INTO "notifications" VALUES(8,'2026-11-11T19:03:43Z',NULL,'Market research finished','2024-11-21..2026-11-11
 REJECTED: asian_handicap, double_chance, result; SHADOW: btts, cards_total, corners_total, fouls_total, goals_total, ht_goals_total, ht_team_goals, red_card, team_cards, team_corners, team_fouls, team_goals, team_yellows, yellows_total
 Only PASSED markets can be used by the paper bankroll.','default','bar_chart',0,0,NULL);
+INSERT INTO "notifications" VALUES(9,'2026-11-11T19:04:01Z','config:missing','Setup incomplete','Missing secrets: ODDS_API_KEY, FOOTBALL_DATA_ORG_KEY. Scanning/settlement are limited until they are added.','high','warning',0,0,NULL);
 CREATE TABLE predictions (
   fixture_id INTEGER PRIMARY KEY, created_at TEXT, league TEXT, home TEXT, away TEXT, kickoff TEXT,
   model_version TEXT, params TEXT);
@@ -53,6 +54,8 @@ CREATE TABLE provider_status (
 CREATE TABLE ratings (competition TEXT PRIMARY KEY, fitted_at TEXT, model TEXT);
 CREATE TABLE runs (
   id INTEGER PRIMARY KEY, started_at TEXT, finished_at TEXT, status TEXT, summary TEXT);
+INSERT INTO "runs" VALUES(1,'2026-11-11T19:04:01Z','2026-11-11T19:04:01Z','ok','missing secrets: ODDS_API_KEY, FOOTBALL_DATA_ORG_KEY
+not scanning: no odds source configured (ODDS_API_KEY / API_FOOTBALL_KEY)');
 CREATE TABLE shadow (
   id INTEGER PRIMARY KEY, first_seen TEXT NOT NULL, last_seen TEXT, local_date TEXT, event_id TEXT NOT NULL,
   sport_key TEXT, competition TEXT, home TEXT, away TEXT, kickoff TEXT, market TEXT NOT NULL,

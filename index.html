@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Football Bet Tracker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1b1f24;--muted:#5b6470;--line:#e2e5ea;--good:#137a3f;--bad:#b42318;--warn:#a15c00;--accent:#1f5fbf}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#171b21;--text:#e7eaee;--muted:#9aa3ad;--line:#2a3038;--good:#4cc38a;--bad:#ff7a6b;--warn:#f2b45a;--accent:#7fb0ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px}h1{font-size:22px;margin:4px 0 2px}h2{font-size:16px;margin:24px 0 8px}
+.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.v{font-size:22px;font-weight:600;margin-top:2px}
+.banner{border-radius:10px;padding:10px 12px;margin:12px 0;border:1px solid var(--line);background:var(--card)}
+.warn{border-color:var(--warn)}.bad{color:var(--bad)}.good{color:var(--good)}
+.scroll{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600}td.wrap{white-space:normal;min-width:240px}
+</style></head><body><main>
+<h1>Football Bet Tracker</h1>
+<div class="muted">Updated 2026-11-11 19:04 UTC · 0 upcoming matches seen in last scan</div>
+<div class="banner warn"><b>Paper trading.</b> No real money is staked. Every bet is simulated at the quoted bookmaker price.</div>
+<div class="grid" style="margin-top:12px"><div class="card"><div class="k">Bankroll</div><div class="v">€10.00</div></div><div class="card"><div class="k">Net result</div><div class="v">€0.00</div></div><div class="card"><div class="k">Status</div><div class="v">Active</div></div><div class="card"><div class="k">Mode</div><div class="v">PAPER (simulated)</div></div><div class="card"><div class="k">Bets won / lost</div><div class="v">0 / 0</div></div><div class="card"><div class="k">Wins in a row needed</div><div class="v">14</div></div></div>
+<div class="banner"><b>Risk.</b> Each bet stakes the whole bankroll. One loss ends the run at €0, and no
+deposits are allowed. Reaching €500 from €10 at odds 1.30–1.40 needs 12–15 wins in a row.</div>
+<h2>Favorite teams — upcoming</h2><div class="card"><span class="muted">No favorite-team match in the next 36 h</span></div>
+<h2>Bets</h2><div class="scroll"><table><thead><tr><th>Date</th><th>#</th><th>Mode</th><th>Status</th><th>Stake</th><th>Odds</th><th>p</th><th>EV</th><th>Return</th><th>Selections</th></tr></thead><tbody><tr><td colspan="10" class="muted">Nothing yet</td></tr></tbody></table></div>
+<h2>Shadow entries (not staked)</h2><div class="muted">Entries that need a market still in SHADOW.
+Tracked to build forward evidence. 0 settled
+(small samples prove nothing).</div><div class="scroll"><table><thead><tr><th>Date</th><th>Odds</th><th>p</th><th>EV</th><th>Result</th><th>Selections</th></tr></thead><tbody><tr><td colspan="6" class="muted">Nothing yet</td></tr></tbody></table></div>
+<h2>Decisions</h2><div class="scroll"><table><thead><tr><th>Date</th><th>Outcome</th><th>Reason</th></tr></thead><tbody><tr><td colspan="3" class="muted">Nothing yet</td></tr></tbody></table></div>
+<h2>Ledger</h2><div class="scroll"><table><thead><tr><th>Time (UTC)</th><th>Type</th><th>Amount</th><th>Cash balance</th><th>Note</th></tr></thead><tbody><tr><td>2026-11-11 17:36</td><td>DEPOSIT</td><td>€10.00</td><td>€10.00</td><td>initial bankroll (the only deposit ever allowed)</td></tr></tbody></table></div>
+<h2>Model reliability</h2><div class="card">Needs 30 settled selections before calibration can be measured.</div>
+<h2>Backtest</h2><div class="card">2025-11-11..2026-11-11: 0 bets met every rule. 1X2 Brier model 0.6035 vs bookmakers 0.5876 on 5831 matches (lower is better). Value-flagged selections: 94, flat-stake ROI -19.7%.</div>
+<h2>Data providers</h2><div class="scroll"><table><thead><tr><th>Provider</th><th>Last OK</th><th>Failures in a row</th><th>Last error</th></tr></thead><tbody><tr><td colspan="4" class="muted">Nothing yet</td></tr></tbody></table></div>
+<h2>Recent runs</h2><div class="scroll"><table><thead><tr><th>Started (UTC)</th><th>Status</th><th>Summary</th></tr></thead><tbody><tr><td>2026-11-11T19:04</td><td>ok</td><td class="wrap">not scanning: no odds source configured (ODDS_API_KEY / API_FOOTBALL_KEY)</td></tr></tbody></table></div>
+</main></body></html>
