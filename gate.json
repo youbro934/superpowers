@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-11T18:57:06.993644+00:00",
+ "generated": "2026-11-11T19:03:43.606822+00:00",
  "test_period": "2024-11-21..2026-11-11",
  "rules": {
   "min_bets": 300,
@@ -52,10 +52,81 @@
    "evidence": []
   },
   "goals_total": {
-   "status": "REJECTED",
-   "reason": "no selection showed a statistically reliable edge at historical prices",
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 14 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
-   "shadow": [],
+   "shadow": [
+    [
+     "over",
+     1.5,
+     "dc"
+    ],
+    [
+     "under",
+     1.5,
+     "dc"
+    ],
+    [
+     "over",
+     3.5,
+     "dc"
+    ],
+    [
+     "under",
+     3.5,
+     "dc"
+    ],
+    [
+     "over",
+     4.5,
+     "dc"
+    ],
+    [
+     "under",
+     4.5,
+     "dc"
+    ],
+    [
+     "over",
+     0.5,
+     "glm"
+    ],
+    [
+     "under",
+     0.5,
+     "glm"
+    ],
+    [
+     "over",
+     1.5,
+     "glm"
+    ],
+    [
+     "under",
+     1.5,
+     "glm"
+    ],
+    [
+     "over",
+     3.5,
+     "glm"
+    ],
+    [
+     "under",
+     3.5,
+     "glm"
+    ],
+    [
+     "over",
+     4.5,
+     "glm"
+    ],
+    [
+     "under",
+     4.5,
+     "glm"
+    ]
+   ],
    "evidence": [
     "goals_total:over@2.5|dc|all: n=1844 roi=-0.008 ci=[-0.052,+0.035] clv=-0.04856720010746352 ece=0.03741415113250062",
     "goals_total:over@2.5|glm|all: n=1977 roi=-0.027 ci=[-0.070,+0.015] clv=-0.04228215302830016 ece=0.025430007021469324",
@@ -1201,6 +1272,76 @@
    "btts",
    "no",
    null
+  ],
+  [
+   "totals",
+   "over",
+   1.5
+  ],
+  [
+   "totals",
+   "under",
+   1.5
+  ],
+  [
+   "totals",
+   "over",
+   3.5
+  ],
+  [
+   "totals",
+   "under",
+   3.5
+  ],
+  [
+   "totals",
+   "over",
+   4.5
+  ],
+  [
+   "totals",
+   "under",
+   4.5
+  ],
+  [
+   "totals",
+   "over",
+   0.5
+  ],
+  [
+   "totals",
+   "under",
+   0.5
+  ],
+  [
+   "totals",
+   "over",
+   1.5
+  ],
+  [
+   "totals",
+   "under",
+   1.5
+  ],
+  [
+   "totals",
+   "over",
+   3.5
+  ],
+  [
+   "totals",
+   "under",
+   3.5
+  ],
+  [
+   "totals",
+   "over",
+   4.5
+  ],
+  [
+   "totals",
+   "under",
+   4.5
   ],
   [
    "corners_totals",
