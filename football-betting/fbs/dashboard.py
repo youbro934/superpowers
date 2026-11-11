@@ -94,6 +94,13 @@ def write(engine) -> str:
                   wrap=("Summary",))
     favs = disc.get("favorites") or []
     fav_html = "<br>".join(e(f) for f in favs) or '<span class="muted">No favorite-team match in the next 36 h</span>'
+    bt = s.get("backtest")
+    bt_html = ("Not run yet." if not bt else
+               f"{bt['period']}: {bt['bets']} bets met every rule. 1X2 Brier model {bt['brier_1x2']['model']:.4f} vs "
+               f"bookmakers {bt['brier_1x2']['market']:.4f} on {bt['brier_1x2']['matches']} matches "
+               f"(lower is better). " + (f"Value-flagged selections: {bt['value_legs']['n']}, flat-stake ROI "
+                                         f"{bt['value_legs']['flat_stake_roi']:+.1%}."
+                                         if bt.get("value_legs", {}).get("n") else ""))
     calib_html = (f"Model Brier {calib['brier_model']:.3f} vs bookmaker {calib['brier_market']:.3f} "
                   f"on {calib['n']} settled selections (lower is better)." if calib
                   else "Needs 30 settled selections before calibration can be measured.")
@@ -121,6 +128,7 @@ deposits are allowed. Reaching €500 from €10 at odds 1.30–1.40 needs 12–
 <h2>Decisions</h2>{dec_tbl}
 <h2>Ledger</h2>{ledger_tbl}
 <h2>Model reliability</h2><div class="card">{e(calib_html)}</div>
+<h2>Backtest</h2><div class="card">{e(bt_html)}</div>
 <h2>Data providers</h2>{prov_tbl}
 <h2>Recent runs</h2>{runs_tbl}
 </main></body></html>"""

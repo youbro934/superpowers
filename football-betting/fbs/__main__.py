@@ -84,7 +84,7 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         print(f"leg {leg['id']} marked {args[1]}; bankroll {eur(bank.balance)} state {bank.status}")
         return 0
     if cmd == "backtest":
-        from .backtest import run_backtest, summary_text
+        from .backtest import model_beats_market, run_backtest, summary_text
         days = int(args[0]) if args else 365
         r = run_backtest(eng.history, eng.cfg, utcnow().date(), days)
         with open(os.path.join(eng.dir, "backtest.json"), "w", encoding="utf-8") as f:
@@ -92,6 +92,13 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         text = summary_text(r)
         print(text)
         eng.notifier.queue("Backtest finished", text, tags="bar_chart")
+        store.set("backtest", {k: r[k] for k in ("period", "bets", "brier_1x2", "value_legs",
+                                                 "brier_by_model_weight", "flat_stake_roi")})
+        if model_beats_market(r) is False:
+            eng.notifier.queue("Model reliability warning",
+                               "On historical data the model is less accurate than the bookmakers' closing odds, "
+                               "so its 'value' signals are not evidence of a real edge. Expect NO BET most days.",
+                               priority="high", tags="warning")
         store.commit()
         eng.notifier.flush()
         store.commit()
