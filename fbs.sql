@@ -23,6 +23,7 @@ INSERT INTO "meta" VALUES('initial_cents','1000');
 CREATE TABLE notifications (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, dedupe_key TEXT, title TEXT, body TEXT,
   priority TEXT, tags TEXT, sent INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0, error TEXT);
+INSERT INTO "notifications" VALUES(1,'2026-11-11T17:40:43Z',NULL,'Backtest finished','Backtest 2025-11-11..2026-11-11: 0 qualifying bets. Brier model/market: {''model'': 0.6034667355001078, ''market'': 0.587630255091467, ''matches'': 5831}','default','bar_chart',0,0,NULL);
 CREATE TABLE provider_status (
   provider TEXT PRIMARY KEY, last_ok TEXT, last_error TEXT, last_error_at TEXT,
   consecutive_failures INTEGER NOT NULL DEFAULT 0);

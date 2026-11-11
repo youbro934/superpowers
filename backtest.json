@@ -1,0 +1,40 @@
+{
+ "period": "2025-11-11..2026-11-11",
+ "bets": 0,
+ "wins": 0,
+ "hit_rate": null,
+ "avg_odds": null,
+ "avg_claimed_ev": null,
+ "flat_stake_roi": null,
+ "compound_sim": {
+  "busts": 0,
+  "targets_500": 0,
+  "longest_win_streak": 0,
+  "final_bank_of_current_run": 10.0
+ },
+ "brier_1x2": {
+  "model": 0.6034667355001078,
+  "market": 0.587630255091467,
+  "matches": 5831
+ },
+ "legs_per_league": {
+  "PL": 6,
+  "ELC": 9,
+  "PD": 13,
+  "BL1": 9,
+  "SA": 8,
+  "FL1": 5,
+  "PPL": 11,
+  "DED": 3,
+  "BEL": 7,
+  "SPL": 1,
+  "TUR": 10,
+  "GRE": 5,
+  "BSA": 4,
+  "ARG": 0,
+  "MLS": 1,
+  "MEX": 2,
+  "JPN": 0
+ },
+ "bets_detail": []
+}
