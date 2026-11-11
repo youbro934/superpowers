@@ -19,13 +19,14 @@ import numpy as np
 
 from ..config import COMPETITIONS
 from ..models import MatchRecord, fit_league, score_matrix as dc_matrix
-from .data import Match, ResearchData, coverage
+from .data import Match, ResearchData, coverage, load_archive, merge
 from .evaluate import BetLog, ProbScore
 from .features import TARGET_INPUTS, FeatureBuilder, design_row
 from .glm import CountModel, convolve, count_pmf, p_over
 from .markets import (CARD_LINES, CORNER_LINES, FOUL_LINES, GOAL_LINES, HT_LINES, PRICED, TEAM_CORNER_LINES,
                       TEAM_FOUL_LINES, TEAM_GOAL_LINES, TEAM_YELLOW_LINES, UNAVAILABLE, YELLOW_LINES, Pred,
-                      ah_expected, ah_payout, attach_ou25_prices, count_preds, devig, result_preds)
+                      ah_expected, ah_payout, attach_archive_prices, attach_ou25_prices, count_preds, devig,
+                      result_preds)
 
 TARGETS = tuple(TARGET_INPUTS)
 MIN_HISTORY = 5
@@ -53,7 +54,8 @@ def _months(start: date, end: date):
 
 class Research:
     def __init__(self, data: ResearchData, today: date, seasons: int = 4, test_months: int = 24,
-                 comps=None, log=print):
+                 comps=None, log=print, archive_dir: str | None = None):
+        self.archive_dir = archive_dir
         self.data = data
         self.today = today
         self.seasons = seasons
@@ -72,6 +74,11 @@ class Research:
                 continue
             cov[comp.code] = coverage(ms) | {"source": ms[0].source.rsplit("/", 2)[0] if ms else None}
             matches.extend(ms)
+        if self.archive_dir:
+            arch = load_archive(self.archive_dir)
+            cov["forward_archive"] = {"matches": len(arch), "with_odds": sum(1 for a in arch if a.extra.get("apif_odds")),
+                                      "source": "api-football (collected by this system)"}
+            matches = merge(matches, arch)
         matches.sort(key=lambda m: (m.day, m.league, m.home))
         self.log(f"loaded {len(matches)} matches")
 
@@ -81,6 +88,7 @@ class Research:
             feats[id(m)] = fb.features(m)
             fb.update(m)
         self._build_design(matches, feats)
+        self.level = defaultdict(lambda: [0.0, 0, 0])
 
         test_start = self.today - timedelta(days=30 * self.test_months)
         scores: dict[tuple, ProbScore] = defaultdict(ProbScore)
@@ -125,40 +133,47 @@ class Research:
         """One design matrix per target, built once; rows are (match, side)."""
         self.design = {}
         for tgt in TARGETS:
-            X, y, days, index = [], [], [], {}
+            X, y, days, off, index = [], [], [], [], {}
             for m in matches:
                 for side, sf in enumerate(feats[id(m)]):
-                    if not _usable(sf, tgt):
+                    if not _usable(sf, tgt) or not sf.values.get(f"{tgt}_league_mean"):
                         continue
                     index[(id(m), side)] = len(X)
                     X.append(design_row(sf, tgt)[0])
                     y.append(m.stats[tgt][side] if tgt in m.stats else np.nan)
                     days.append(m.day.toordinal())
-            self.design[tgt] = (np.array(X, float), np.array(y, float), np.array(days), index)
+                    # league average for this side at that date: each league keeps its own level
+                    off.append(math.log(max(sf.values[f"{tgt}_league_mean"], 1e-3)))
+            self.design[tgt] = (np.array(X, float), np.array(y, float), np.array(days), index, np.array(off))
 
     def _fit_glms(self, t0: date) -> dict:
         out = {}
         lo, hi = (t0 - timedelta(days=3 * 365)).toordinal(), t0.toordinal()
         for tgt in TARGETS:
-            X, y, days, _ = self.design[tgt]
+            X, y, days, _, off = self.design[tgt]
             if not len(y):
                 continue
             mask = (days >= lo) & (days < hi) & ~np.isnan(y)
             if mask.sum() < 400:
                 continue
-            out[tgt] = CountModel(ridge=5.0 if tgt == "reds" else 2.0).fit(X[mask], y[mask])
+            out[tgt] = CountModel(ridge=5.0 if tgt == "reds" else 2.0).fit(X[mask], y[mask], off[mask])
         return out
 
     def _side_mus(self, m, sfs, models, tgt):
         cm = models.get(tgt)
         if cm is None:
             return None
-        X, _, _, index = self.design[tgt]
+        X, _, _, index, off = self.design[tgt]
         try:
-            rows = X[[index[(id(m), 0)], index[(id(m), 1)]]]
+            ix = [index[(id(m), 0)], index[(id(m), 1)]]
         except KeyError:
             return None      # not enough history for one of the teams
-        mu = cm.predict(rows)
+        mu = cm.predict(X[ix], off[ix])
+        if tgt in m.stats:      # level check: average predicted vs actual count per league
+            lv = self.level[(m.league, tgt)]
+            lv[0] += float(mu[0] + mu[1])
+            lv[1] += sum(m.stats[tgt])
+            lv[2] += 1
         return float(mu[0]), float(mu[1]), cm.alpha
 
     def _predict(self, m: Match, sfs, models, dcm) -> list[Pred]:
@@ -211,6 +226,7 @@ class Research:
                     won = int(total > l) if have else None
                     preds.append(Pred("cards_total", "over", l, "glm", po, won))
                     preds.append(Pred("cards_total", "under", l, "glm", 1 - po, None if won is None else 1 - won))
+        attach_archive_prices(preds, m)
         return preds
 
     # ----------------------------------------------------------------- scoring
@@ -304,7 +320,7 @@ class Research:
             markets[fam]["by_league"][f"{lg}|{model}"] = {k: s.get(k) for k in ("n", "brier", "ece")}
         for fam in markets:
             markets[fam]["historical_prices"] = any(k.startswith(fam) for k in PRICED) or \
-                any(f"{fam}@" in k for k in PRICED)
+                any(b.get("n") for b in markets[fam]["bets"].values())
         return {
             "test_period": f"{test_start.isoformat()}..{self.today.isoformat()}",
             "method": "monthly walk-forward refit; features from earlier matches only; "
@@ -312,6 +328,9 @@ class Research:
             "coverage": cov,
             "markets": dict(markets),
             "dispersion_alpha": {k: (sum(v) / len(v) if v else None) for k, v in dispersion.items()},
+            "level_check": {f"{lg}|{t}": {"n": n, "predicted_mean": ps / n, "actual_mean": a / n,
+                                          "bias": ps / a - 1 if a else None}
+                            for (lg, t), (ps, a, n) in sorted(self.level.items()) if n},
             "correlations": correlations([m for m in matches if m.day >= test_start]),
             "unavailable": UNAVAILABLE,
         }

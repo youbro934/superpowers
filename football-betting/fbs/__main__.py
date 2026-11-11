@@ -126,7 +126,8 @@ def _research(eng: Engine, args: list[str]) -> int:
     from .research.report import render
     months = int(args[0]) if args else 24
     data = ResearchData(os.path.join(eng.cache_dir, "research"))
-    report = Research(data, utcnow().date(), seasons=4, test_months=months).run()
+    report = Research(data, utcnow().date(), seasons=4, test_months=months,
+                      archive_dir=os.path.join(eng.dir, "archive", "api-football")).run()
     gate = evaluate_gate(report)
     with open(os.path.join(eng.dir, "research.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=1, default=str)

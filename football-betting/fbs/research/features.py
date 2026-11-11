@@ -73,6 +73,7 @@ class FeatureBuilder:
             lg_against = lg_for     # what this side's opponent concedes, on average, is the same quantity
             if n_lg < 30:
                 continue
+            vals[f"{stat}_league_mean"] = lg_for       # baseline (offset), not a model feature
             th = [r for r in self.team_hist[team] if stat in r["stats"]]
             oh = [r for r in self.team_hist[opp] if stat in r["stats"]]
             for k in WINDOWS:

@@ -148,3 +148,81 @@ def attach_ou25_prices(preds: list[Pred], m):
             p.price = taken[1][k] if taken else None
             p.close_p = cp[k] if cp else None
             p.close_price = close[1][k] if close else None
+
+
+# API-Football bet names -> research families. Unknown names are ignored, never guessed.
+APIF_BETS = {
+    "Match Winner": "result", "Double Chance": "double_chance", "Goals Over/Under": "goals_total",
+    "Both Teams Score": "btts", "Goals Over/Under First Half": "ht_goals_total",
+    "Total - Home": "team_goals:home", "Total - Away": "team_goals:away",
+    "Corners Over Under": "corners_total", "Home Corners Over/Under": "team_corners:home",
+    "Away Corners Over/Under": "team_corners:away", "Cards Over/Under": "cards_total",
+    "Home Team Total Cards": "team_cards:home", "Away Team Total Cards": "team_cards:away",
+    "Fouls Over/Under": "fouls_total",
+}
+_APIF_VALUES = {"Home": "home", "Draw": "draw", "Away": "away", "Yes": "yes", "No": "no",
+                "Home/Draw": "1X", "Draw/Away": "X2", "Home/Away": "12"}
+
+
+def _apif_key(bet: str, value: str):
+    fam = APIF_BETS.get(bet)
+    if not fam:
+        return None
+    side = None
+    if ":" in fam:
+        fam, side = fam.split(":")
+    v = value.strip()
+    if v.split(" ")[0] in ("Over", "Under"):
+        try:
+            line = float(v.split(" ")[1])
+        except (IndexError, ValueError):
+            return None
+        if abs(line % 1 - 0.5) > 1e-9:
+            return None
+        ou = v.split(" ")[0].lower()
+        return fam, (f"{side}_{ou}" if side else ou), line
+    sel = _APIF_VALUES.get(v)
+    return (fam, sel, None) if sel else None
+
+
+def attach_archive_prices(preds: list[Pred], m):
+    """Price selections from forward-collected odds: median 'open' price as the price
+    taken, de-vigged 'close' snapshot as the closing reference."""
+    recs = m.extra.get("apif_odds") or []
+    if not recs:
+        return
+    taken, close = {}, {}
+    for r in recs:
+        k = _apif_key(r.get("bet", ""), r.get("value", ""))
+        if not k:
+            continue
+        (taken if r.get("snapshot") == "open" else close).setdefault(k, {})[r.get("bookmaker")] = r["odd"]
+    groups = {"result": ("home", "draw", "away"), "btts": ("yes", "no")}
+
+    def fair(fam, sel, line):
+        if fam in groups:
+            members = groups[fam]
+        elif sel.endswith("over") or sel.endswith("under"):
+            base = sel.rsplit("_", 1)[0] + "_" if "_" in sel else ""
+            members = (base + "over", base + "under")
+        else:
+            return None
+        books = set.intersection(*[set(close.get((fam, s, line), {})) for s in members]) if all(
+            (fam, s, line) in close for s in members) else set()
+        vals = []
+        for b in books:
+            inv = {s: 1 / close[(fam, s, line)][b] for s in members}
+            vals.append(inv[sel] / sum(inv.values()))
+        return sum(vals) / len(vals) if vals else None
+
+    for p in preds:
+        if p.price is not None:
+            continue
+        k = (p.family, p.sel, p.line)
+        if k in taken:
+            prices = sorted(taken[k].values())
+            p.price = prices[len(prices) // 2]
+            p.close_p = fair(*k)
+            if k in close:
+                cp = sorted(close[k].values())
+                p.close_price = cp[len(cp) // 2]

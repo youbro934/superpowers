@@ -18,6 +18,9 @@ MIN_BETS = 300
 MAX_ECE = 0.03
 MIN_SHADOW_N = 500
 
+# families with free historical prices; the rest can only earn evidence forward
+HIST_PRICED = {"result", "double_chance", "goals_total", "asian_handicap"}
+
 PROD = {"result": "h2h", "double_chance": "double_chance", "goals_total": "totals", "btts": "btts",
         "corners_total": "corners_totals", "cards_total": "cards_totals"}
 PROD_SEL = {"1X": "home_draw", "X2": "draw_away", "12": "home_away"}
@@ -58,7 +61,7 @@ def evaluate_gate(report: dict) -> dict:
                          f"clv={b.get('clv_mean')} ece={cal}")
             if ok:
                 passed.append((sel, line, model))
-        priced = data.get("historical_prices")
+        priced = fam in HIST_PRICED
         if not priced:
             for skey, s in sels.items():
                 f2, sel, line, (model,) = _parse_key(skey)

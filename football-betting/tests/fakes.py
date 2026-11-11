@@ -112,13 +112,14 @@ class FakeWorld:
         raise ProviderError(provider, f"unexpected url {url}", 404)
 
 
-def synthetic_full_csv(end: date, seasons: int = 3, seed: int = 11, margin: float = 0.05) -> str:
+def synthetic_full_csv(end: date, seasons: int = 3, seed: int = 11, margin: float = 0.05,
+                       foul_scale: float = 1.0, prefix: str = "") -> str:
     """SYNTHETIC league with every statistic and bookmaker prices built from the TRUE
     probabilities plus a margin: a correct backtest must find no edge here."""
     from fbs.models import goal_market_probs, score_matrix
     rng = random.Random(seed)
-    refs = ["Ref A", "Ref B", "Ref C", "Ref D"]
-    ref_card = {"Ref A": 0.7, "Ref B": 1.0, "Ref C": 1.2, "Ref D": 1.5}
+    refs = [prefix + r for r in ("Ref A", "Ref B", "Ref C", "Ref D")]
+    ref_card = {prefix + k: v for k, v in {"Ref A": 0.7, "Ref B": 1.0, "Ref C": 1.2, "Ref D": 1.5}.items()}
     cols = ("Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,HTHG,HTAG,Referee,HS,AS,HST,AST,HF,AF,HC,AC,HY,AY,HR,AR,"
             "B365H,B365D,B365A,PSCH,PSCD,PSCA,B365>2.5,B365<2.5,PC>2.5,PC<2.5,AHh,B365AHH,B365AHA")
     rows = [cols]
@@ -135,7 +136,7 @@ def synthetic_full_csv(end: date, seasons: int = 3, seed: int = 11, margin: floa
             ref = rng.choice(refs)
             hs, as_ = _poisson(rng, 6 * lam + 4), _poisson(rng, 6 * mu + 3)
             hst, ast = min(hs, _poisson(rng, 2.5 * lam + 1)), min(as_, _poisson(rng, 2.5 * mu + 1))
-            hf, af = _poisson(rng, 11), _poisson(rng, 12)
+            hf, af = _poisson(rng, 11 * foul_scale), _poisson(rng, 12 * foul_scale)
             hc, ac = _poisson(rng, 3 + 1.5 * lam), _poisson(rng, 2.5 + 1.5 * mu)
             hy, ay = _poisson(rng, 1.6 * ref_card[ref]), _poisson(rng, 1.9 * ref_card[ref])
             hr, ar = int(rng.random() < 0.05), int(rng.random() < 0.06)
@@ -145,7 +146,7 @@ def synthetic_full_csv(end: date, seasons: int = 3, seed: int = 11, margin: floa
             k = 1 + margin
             o = lambda q: round(1 / (q * k), 2)
             rows.append(",".join(map(str, [
-                "X1", day.strftime("%d/%m/%Y"), h, a, hg, ag, hth, hta, ref, hs, as_, hst, ast, hf, af, hc, ac,
+                "X1", day.strftime("%d/%m/%Y"), prefix + h, prefix + a, hg, ag, hth, hta, ref, hs, as_, hst, ast, hf, af, hc, ac,
                 hy, ay, hr, ar, o(ph), o(pd), o(pa), o(ph), o(pd), o(pa), o(po), o(1 - po), o(po), o(1 - po),
                 -0.5, o(ph), o(1 - ph)])))
         day += timedelta(days=7)

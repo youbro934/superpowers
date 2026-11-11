@@ -91,6 +91,67 @@ class PieceTests(unittest.TestCase):
         self.assertAlmostEqual(p, ph * 0.5, 9)
 
 
+class TwoLeagueWorld:
+    def __init__(self):
+        self.files = {"E0.csv": synthetic_full_csv(TODAY), "SP1.csv": synthetic_full_csv(TODAY, seed=5, foul_scale=1.3, prefix="Zeta ")}
+
+    def __call__(self, url, **kw):
+        from fbs.util import ProviderError
+        name = url.rsplit("/", 1)[-1]
+        if name in self.files:
+            return Response(200, {}, self.files[name].encode())
+        raise ProviderError("x", "404", 404)
+
+
+class LeagueLevelTests(unittest.TestCase):
+    def test_each_league_keeps_its_own_level(self):
+        data = ResearchData(tempfile.mkdtemp(), http=TwoLeagueWorld())
+        rep = Research(data, TODAY, seasons=4, test_months=8,
+                       comps=[COMPETITION_BY_CODE["PL"], COMPETITION_BY_CODE["PD"]], log=lambda *_: None).run()
+        lv = rep["level_check"]
+        for lg in ("PL", "PD"):
+            # a pooled model without league offsets is ~10% off in each league here
+            self.assertLess(abs(lv[f"{lg}|fouls"]["bias"]), 0.04, lv[f"{lg}|fouls"])
+
+
+class ArchiveTests(unittest.TestCase):
+    def test_archive_matches_and_prices(self):
+        import gzip, json
+        from fbs.research.data import Match, load_archive, merge
+        from fbs.research.markets import Pred, attach_archive_prices
+        d = tempfile.mkdtemp()
+        base = {"source": "api-football", "fetched_at": "2026-11-07T10:00:00Z", "fixture": 9, "league": 71,
+                "home": "flamengo", "away": "palmeiras", "kickoff": "2026-11-07T23:30:00+00:00"}
+        recs = [base | {"kind": "stats", "referee": "R. Claus", "goals": {"home": 2, "away": 1},
+                        "ht": {"home": 1, "away": 0},
+                        "stats": {"home_corners": 7, "away_corners": 4, "home_yellows": 2, "away_yellows": 3,
+                                  "home_xg": 1.9, "away_xg": 0.8}}]
+        for snap, o, u in (("open", 1.90, 1.90), ("close", 1.80, 2.00)):
+            for book in ("A", "B"):
+                recs.append(base | {"kind": "odds", "snapshot": snap, "bookmaker": book,
+                                    "bet": "Corners Over Under", "value": "Over 9.5", "odd": o})
+                recs.append(base | {"kind": "odds", "snapshot": snap, "bookmaker": book,
+                                    "bet": "Corners Over Under", "value": "Under 9.5", "odd": u})
+        with gzip.open(os.path.join(d, "2026-11-07.jsonl.gz"), "wt") as f:
+            f.write("\n".join(json.dumps(r) for r in recs))
+        ms = load_archive(d)
+        self.assertEqual(len(ms), 1)
+        m = ms[0]
+        self.assertEqual(m.league, "BSA")
+        self.assertEqual(m.stats["corners"], (7, 4))
+        self.assertEqual(m.stats["reds"], (0, 0))
+        self.assertNotIn("fouls", m.stats)
+        p = Pred("corners_total", "over", 9.5, "glm", 0.55, 1)
+        attach_archive_prices([p], m)
+        self.assertEqual(p.price, 1.90)
+        self.assertAlmostEqual(p.close_p, (1 / 1.8) / (1 / 1.8 + 1 / 2.0), 9)
+        # merging onto a results-only row a day earlier (time zones) enriches instead of duplicating
+        older = Match("BSA", m.day.replace(day=6), "flamengo", "palmeiras", {"goals": (2, 1)}, None, {}, "couk", "")
+        merged = merge([older], ms)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0].stats["corners"], (7, 4))
+
+
 class ResearchRunTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

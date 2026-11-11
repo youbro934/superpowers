@@ -195,3 +195,80 @@ def coverage(matches: list[Match]) -> dict:
             c = sum(1 for m in matches if k in m.odds)
         cov[k] = round(c / n, 3)
     return cov
+
+
+# API-Football league id -> internal competition code
+APIF_LEAGUES = {71: "BSA", 94: "PPL", 140: "PD", 61: "FL1", 78: "BL1", 39: "PL", 135: "SA",
+                72: "BSB", 73: "CDB", 13: "LIB", 2: "UCL", 3: "UEL"}
+_APIF_STATS = {"corners": "corners", "fouls": "fouls", "yellows": "yellows", "reds": "reds", "sot": "sot",
+               "shots": "shots"}
+
+
+def load_archive(archive_dir: str) -> list[Match]:
+    """Matches (with stats) and odds snapshots collected forward from API-Football."""
+    import gzip
+    import json
+    if not os.path.isdir(archive_dir):
+        return []
+    stats_recs, odds = {}, {}
+    for fn in sorted(os.listdir(archive_dir)):
+        if not fn.endswith(".jsonl.gz"):
+            continue
+        with gzip.open(os.path.join(archive_dir, fn), "rt", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("kind") == "stats":
+                    stats_recs[r["fixture"]] = r
+                elif r.get("kind") == "odds":
+                    odds.setdefault(r["fixture"], []).append(r)
+    out = []
+    for fid, r in stats_recs.items():
+        g = r.get("goals") or {}
+        if g.get("home") is None or g.get("away") is None:
+            continue
+        st = {"goals": (int(g["home"]), int(g["away"]))}
+        ht = r.get("ht") or {}
+        if ht.get("home") is not None and ht.get("away") is not None:
+            st["ht_goals"] = (int(ht["home"]), int(ht["away"]))
+        s = r.get("stats", {})
+        for key, name in _APIF_STATS.items():
+            h, a = s.get(f"home_{key}"), s.get(f"away_{key}")
+            if h is not None and a is not None:
+                st[name] = (int(h), int(a))
+        # API-Football omits the red-card row when there were none; only infer 0 when yellows are present
+        if "reds" not in st and "yellows" in st and s.get("home_reds") is None and s.get("away_reds") is None:
+            st["reds"] = (0, 0)
+        day = datetime.fromisoformat(r["kickoff"].replace("Z", "+00:00")).date()
+        m = Match(APIF_LEAGUES.get(r.get("league"), f"APIF{r.get('league')}"), day, r["home"], r["away"], st,
+                  r.get("referee"), {}, "api-football fixture %s" % fid, r.get("fetched_at", ""))
+        m.extra["apif_odds"] = odds.get(fid, [])
+        if s.get("home_xg") is not None and s.get("away_xg") is not None:
+            m.extra["xg"] = (s["home_xg"], s["away_xg"])
+        out.append(m)
+    return out
+
+
+def merge(base: list[Match], archive: list[Match]) -> list[Match]:
+    """Add archive matches; when the same fixture exists (same teams, +-1 day), enrich it instead."""
+    from datetime import timedelta
+    index = {(m.league, m.home, m.away, m.day): m for m in base}
+    for a in archive:
+        hit = None
+        for dd in (0, -1, 1):
+            hit = index.get((a.league, a.home, a.away, a.day + timedelta(days=dd)))
+            if hit:
+                break
+        if hit:
+            for k, v in a.stats.items():
+                hit.stats.setdefault(k, v)
+            hit.referee = hit.referee or a.referee
+            hit.extra.update(a.extra)
+            hit.source += f" + {a.source}"
+        else:
+            base.append(a)
+            index[(a.league, a.home, a.away, a.day)] = a
+    base.sort(key=lambda m: m.day)
+    return base
