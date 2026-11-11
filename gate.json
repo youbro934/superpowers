@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-11T18:27:52.561286+00:00",
+ "generated": "2026-11-11T18:57:06.993644+00:00",
  "test_period": "2024-11-21..2026-11-11",
  "rules": {
   "min_bets": 300,
@@ -307,11 +307,31 @@
   },
   "team_corners": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 20 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 36 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
      "home_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_over",
      2.5,
      "glm"
     ],
@@ -361,6 +381,46 @@
      "glm"
     ],
     [
+     "home_over",
+     7.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     7.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     8.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     8.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     1.5,
+     "glm"
+    ],
+    [
      "away_over",
      2.5,
      "glm"
@@ -408,6 +468,26 @@
     [
      "away_under",
      6.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     7.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     7.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     8.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     8.5,
      "glm"
     ]
    ],
@@ -415,11 +495,31 @@
   },
   "fouls_total": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 10 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 18 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
      "over",
+     14.5,
+     "glm"
+    ],
+    [
+     "under",
+     14.5,
+     "glm"
+    ],
+    [
+     "over",
+     16.5,
+     "glm"
+    ],
+    [
+     "under",
+     16.5,
+     "glm"
+    ],
+    [
+     "over",
      18.5,
      "glm"
     ],
@@ -466,6 +566,26 @@
     [
      "under",
      26.5,
+     "glm"
+    ],
+    [
+     "over",
+     28.5,
+     "glm"
+    ],
+    [
+     "under",
+     28.5,
+     "glm"
+    ],
+    [
+     "over",
+     30.5,
+     "glm"
+    ],
+    [
+     "under",
+     30.5,
      "glm"
     ]
    ],
@@ -473,11 +593,31 @@
   },
   "team_fouls": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 24 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 44 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
      "home_over",
+     6.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     6.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     7.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     7.5,
+     "glm"
+    ],
+    [
+     "home_over",
      8.5,
      "glm"
     ],
@@ -537,6 +677,56 @@
      "glm"
     ],
     [
+     "home_over",
+     14.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     14.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     15.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     15.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     16.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     16.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     6.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     6.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     7.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     7.5,
+     "glm"
+    ],
+    [
      "away_over",
      8.5,
      "glm"
@@ -594,6 +784,36 @@
     [
      "away_under",
      13.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     14.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     14.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     15.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     15.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     16.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     16.5,
      "glm"
     ]
    ],
@@ -601,11 +821,21 @@
   },
   "yellows_total": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 8 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 14 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
      "over",
+     1.5,
+     "glm"
+    ],
+    [
+     "under",
+     1.5,
+     "glm"
+    ],
+    [
+     "over",
      2.5,
      "glm"
     ],
@@ -642,6 +872,26 @@
     [
      "under",
      5.5,
+     "glm"
+    ],
+    [
+     "over",
+     6.5,
+     "glm"
+    ],
+    [
+     "under",
+     6.5,
+     "glm"
+    ],
+    [
+     "over",
+     7.5,
+     "glm"
+    ],
+    [
+     "under",
+     7.5,
      "glm"
     ]
    ],
@@ -649,7 +899,7 @@
   },
   "team_yellows": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 12 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 16 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
@@ -683,6 +933,16 @@
      "glm"
     ],
     [
+     "home_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     3.5,
+     "glm"
+    ],
+    [
      "away_over",
      0.5,
      "glm"
@@ -710,6 +970,16 @@
     [
      "away_under",
      2.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     3.5,
      "glm"
     ]
    ],
@@ -735,11 +1005,21 @@
   },
   "cards_total": {
    "status": "SHADOW",
-   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 10 selection(s), so it is logged forward against live odds without staking",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 16 selection(s), so it is logged forward against live odds without staking",
    "passed": [],
    "shadow": [
     [
      "over",
+     1.5,
+     "glm"
+    ],
+    [
+     "under",
+     1.5,
+     "glm"
+    ],
+    [
+     "over",
      2.5,
      "glm"
     ],
@@ -786,6 +1066,114 @@
     [
      "under",
      6.5,
+     "glm"
+    ],
+    [
+     "over",
+     7.5,
+     "glm"
+    ],
+    [
+     "under",
+     7.5,
+     "glm"
+    ],
+    [
+     "over",
+     8.5,
+     "glm"
+    ],
+    [
+     "under",
+     8.5,
+     "glm"
+    ]
+   ],
+   "evidence": []
+  },
+  "team_cards": {
+   "status": "SHADOW",
+   "reason": "no historical prices exist for this market; the model is calibrated and beats the base rate on 16 selection(s), so it is logged forward against live odds without staking",
+   "passed": [],
+   "shadow": [
+    [
+     "home_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     2.5,
+     "glm"
+    ],
+    [
+     "home_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "home_under",
+     3.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     0.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     1.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     2.5,
+     "glm"
+    ],
+    [
+     "away_over",
+     3.5,
+     "glm"
+    ],
+    [
+     "away_under",
+     3.5,
      "glm"
     ]
    ],
@@ -867,6 +1255,16 @@
   [
    "cards_totals",
    "over",
+   1.5
+  ],
+  [
+   "cards_totals",
+   "under",
+   1.5
+  ],
+  [
+   "cards_totals",
+   "over",
    2.5
   ],
   [
@@ -913,6 +1311,26 @@
    "cards_totals",
    "under",
    6.5
+  ],
+  [
+   "cards_totals",
+   "over",
+   7.5
+  ],
+  [
+   "cards_totals",
+   "under",
+   7.5
+  ],
+  [
+   "cards_totals",
+   "over",
+   8.5
+  ],
+  [
+   "cards_totals",
+   "under",
+   8.5
   ]
  ]
 }
