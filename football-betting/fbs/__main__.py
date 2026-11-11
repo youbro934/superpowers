@@ -123,8 +123,9 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
             return 2
         ok, msg = (eng.opps.confirm if cmd == "confirm" else eng.opps.reject)(payload)
         if not ok:
+            # an input the owner can correct is not a system failure: tell the phone, exit cleanly
             eng.notifier.queue(f"{cmd.title()} not recorded", msg, tags="warning")
-        return _finish(eng, msg, 0 if ok else 1)
+        return _finish(eng, msg, 0)
     if cmd == "settle-bet":
         # manual settlement of a whole bet when no verified result can be obtained
         try:

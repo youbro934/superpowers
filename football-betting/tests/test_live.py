@@ -284,10 +284,13 @@ class ManualFlowTests(LiveEngineTests):
         world, picks, opp, out = self._issue()
         eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=30))
         bad = {"id": opp["id"], "stake": 25, "odds": 1.35}
-        self.assertEqual(_dispatch(eng, "confirm", [json.dumps(bad)]), 1)          # beyond bankroll: refused
+        _dispatch(eng, "confirm", [json.dumps(bad)])                                 # beyond bankroll: refused
+        self.assertEqual(eng.store.one("SELECT COUNT(*) FROM bets")[0], 0)
+        self.assertTrue(eng.store.one("SELECT 1 FROM notifications WHERE title='Confirm not recorded'"))
         good = {"id": opp["id"], "stake": 10, "odds": 1.33, "bookmaker": "Bet365", "reference": "ABC123"}
         self.assertEqual(_dispatch(eng, "confirm", [json.dumps(good)]), 0)
-        self.assertEqual(_dispatch(eng, "confirm", [json.dumps(good)]), 1)         # duplicate ignored
+        _dispatch(eng, "confirm", [json.dumps(good)])                                # duplicate ignored
+        self.assertEqual(eng.store.one("SELECT COUNT(*) FROM bets")[0], 1)
         bet = eng.store.one("SELECT * FROM bets")
         self.assertEqual((bet["mode"], bet["stake_cents"], bet["odds"], bet["reference"]), ("manual", 1000, 1.33, "ABC123"))
         eng.close()

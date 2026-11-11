@@ -18,6 +18,25 @@ Runs every hour on GitHub Actions, on GitHub's servers, so your computer doesn't
 7. **Executes** through the paper executor. No money moves.
 8. **Pushes** notifications to your iPhone and rebuilds the dashboard and CSV exports.
 
+## iPhone app (manual betting flow)
+
+The cloud engine finds an entry and the phone gets a push notification. Open the card, then open Bet365 and place the bet
+**yourself**, then tap **I placed this bet** and enter the stake and odds Bet365 accepted. Results settle automatically and
+the bankroll updates. The system never places or submits a bet, never logs in to Bet365 and stores no Bet365 credentials.
+Opening Bet365 is not treated as placing a bet.
+
+* App: `https://<owner>.github.io/<repo>/app/`. It is a PWA served by GitHub Pages from the `fbs-data` branch.
+* Commands (START/STOP, CONTINUE, confirm, decline) are sent from the app as GitHub `workflow_dispatch` runs.
+  They need a fine-grained token stored only on the phone, scoped to **this repository** with **Actions: Read and write**.
+  A command takes effect in about 1–2 minutes.
+* Push notifications come through the free **ntfy** app and arrive even when the PWA is closed. Tapping one opens the matching card.
+* **Bet365:** there is no public, documented deep link that pre-fills a bet slip with third-party selections, so the card
+  opens Bet365 and offers **Copy selections** for manual entry.
+
+**Install on iPhone:** Safari → open the app URL → Share → **Add to Home Screen**. Then open it from the Home Screen →
+Settings → enter the owner, repository, branch (`main`) and token → Save. Install **ntfy**, subscribe to your
+`NTFY_TOPIC`, and tap *Send test notification* in the app.
+
 ## Multi-market research and the promotion gate
 
 The paper bankroll can only stake markets that **passed out-of-sample validation**. `python -m fbs research`
