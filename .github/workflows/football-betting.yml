@@ -1,0 +1,125 @@
+name: Football Betting System
+
+# Hourly autonomous cycle. State (ledger, bets, decisions) lives on the
+# `fbs-data` branch as a text SQL dump plus a static dashboard (index.html).
+# Scheduled runs only fire from the repository's default branch.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "run | status | continue | backtest | notify-test"
+        required: true
+        default: run
+        type: choice
+        options: [run, status, continue, backtest, notify-test]
+      confirm:
+        description: "For 'continue' type exactly: CONTINUE"
+        required: false
+        default: ""
+  push:
+    paths: ["football-betting/**", ".github/workflows/football-betting.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit and end-to-end tests (synthetic data, no network)
+        working-directory: football-betting
+        run: python -m unittest discover -s tests -t . -v
+
+  cycle:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    # one cycle at a time, never cancelled midway: no overlapping bets, no lost state
+    concurrency:
+      group: fbs-state
+      cancel-in-progress: false
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+      FBS_EXECUTION_MODE: ${{ vars.FBS_EXECUTION_MODE || 'paper' }}
+      FBS_ALLOWED_BOOKMAKERS: ${{ vars.FBS_ALLOWED_BOOKMAKERS }}
+      FBS_DASHBOARD_URL: ${{ vars.FBS_DASHBOARD_URL }}
+      FBS_DATA_DIR: ${{ github.workspace }}/state
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Load state branch
+        run: |
+          git config user.name "fbs-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin fbs-data >/dev/null 2>&1; then
+            git fetch --depth=50 origin fbs-data:fbs-data
+            git worktree add state fbs-data
+          else
+            git worktree add --orphan -b fbs-data state
+            printf 'cache/\nfbs.sqlite\n*.tmp\n' > state/.gitignore
+          fi
+
+      - name: Restore provider cache
+        uses: actions/cache/restore@v4
+        with:
+          path: state/cache
+          key: fbs-cache-${{ github.run_id }}
+          restore-keys: fbs-cache-
+
+      - name: Run command
+        working-directory: football-betting
+        env:
+          CMD: ${{ github.event.inputs.command || 'run' }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          case "$CMD" in
+            continue) python -m fbs continue "$CONFIRM" ;;
+            backtest) python -m fbs backtest 365 ;;
+            *) python -m fbs "$CMD" ;;
+          esac
+
+      - name: Save provider cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state/cache
+          key: fbs-cache-${{ github.run_id }}
+
+      - name: Commit state
+        if: always()
+        working-directory: state
+        run: |
+          git add -A
+          if git diff --cached --quiet; then echo "no state change"; exit 0; fi
+          git commit -q -m "state: ${{ github.event.inputs.command || 'run' }} $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3 4; do
+            git push origin fbs-data && exit 0
+            sleep $((2 ** i))
+          done
+          echo "push failed" && exit 1
+
+      - name: Alert on failure
+        if: failure() && env.NTFY_TOPIC != ''
+        run: |
+          curl -sS -H "Content-Type: application/json" \
+            -d "{\"topic\":\"$NTFY_TOPIC\",\"title\":\"Betting system run FAILED\",\"priority\":5,\"tags\":[\"rotating_light\"],\"message\":\"Run ${{ github.run_id }} failed. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            https://ntfy.sh/ || true
