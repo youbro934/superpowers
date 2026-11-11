@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS shadow (
   selection TEXT NOT NULL, line REAL, first_odds REAL, last_odds REAL, bookmaker TEXT, p_model REAL,
   p_market REAL, p_used REAL, ev REAL, reason TEXT, result TEXT, settled_at TEXT,
   UNIQUE(event_id, market, selection, line));
+CREATE TABLE IF NOT EXISTS fixture_results (
+  fixture_id INTEGER PRIMARY KEY, home_goals INTEGER, away_goals INTEGER, ht_home INTEGER, ht_away INTEGER,
+  stats TEXT, fetched_at TEXT);
+CREATE TABLE IF NOT EXISTS predictions (
+  fixture_id INTEGER PRIMARY KEY, created_at TEXT, league TEXT, home TEXT, away TEXT, kickoff TEXT,
+  model_version TEXT, params TEXT);
+CREATE TABLE IF NOT EXISTS shadow_entries (
+  id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, local_date TEXT NOT NULL, odds REAL, prob REAL, ev REAL,
+  legs TEXT NOT NULL, result TEXT, settled_at TEXT, UNIQUE(local_date, legs));
 CREATE TABLE IF NOT EXISTS ratings (competition TEXT PRIMARY KEY, fitted_at TEXT, model TEXT);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, dedupe_key TEXT, title TEXT, body TEXT,

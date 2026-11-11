@@ -91,6 +91,9 @@ class Settings:
     injury_extra_edge: float = 0.02
     injury_alert_count: int = 3
     max_combo_legs: int = 3
+    max_entry_legs: int = 4          # 4th leg only when no 1-3 leg entry qualifies
+    apif_odds_max_age_minutes: int = 240   # free plan budget: prices refreshed every few hours
+    apif_odds_refresh_hours: float = 3.0
     combo_pool_size: int = 25
     min_minutes_to_kickoff: int = 60
     lookahead_hours: int = 36          # discovery window (free event listing)

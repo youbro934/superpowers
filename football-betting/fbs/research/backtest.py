@@ -23,7 +23,7 @@ from .data import Match, ResearchData, coverage, load_archive, merge
 from .evaluate import BetLog, ProbScore
 from .features import TARGET_INPUTS, FeatureBuilder, design_row
 from .glm import CountModel, convolve, count_pmf, p_over
-from .markets import (CARD_LINES, CORNER_LINES, FOUL_LINES, GOAL_LINES, HT_LINES, PRICED, TEAM_CORNER_LINES,
+from .markets import (CARD_LINES, TEAM_CARD_LINES, CORNER_LINES, FOUL_LINES, GOAL_LINES, HT_LINES, PRICED, TEAM_CORNER_LINES,
                       TEAM_FOUL_LINES, TEAM_GOAL_LINES, TEAM_YELLOW_LINES, UNAVAILABLE, YELLOW_LINES, Pred,
                       ah_expected, ah_payout, attach_archive_prices, attach_ou25_prices, count_preds, devig,
                       result_preds)
@@ -226,6 +226,18 @@ class Research:
                     won = int(total > l) if have else None
                     preds.append(Pred("cards_total", "over", l, "glm", po, won))
                     preds.append(Pred("cards_total", "under", l, "glm", 1 - po, None if won is None else 1 - won))
+                # team cards = that team's yellows + reds
+                for k, side in enumerate(("home", "away")):
+                    yp = count_pmf((y[0], y[1])[k], y[2])
+                    rp = np.pad(count_pmf((r[0], r[1])[k], 0.0, 6), (0, len(yp) - 7))
+                    tp = convolve(yp, rp)
+                    val = m.stats["yellows"][k] + m.stats["reds"][k] if have else None
+                    for l in TEAM_CARD_LINES:
+                        po = p_over(tp, l)
+                        won = int(val > l) if have else None
+                        preds.append(Pred("team_cards", f"{side}_over", l, "glm", po, won))
+                        preds.append(Pred("team_cards", f"{side}_under", l, "glm", 1 - po,
+                                          None if won is None else 1 - won))
         attach_archive_prices(preds, m)
         return preds
 
@@ -264,6 +276,11 @@ class Research:
                 for l in CARD_LINES:
                     out += [Pred("cards_total", "over", l, "", 0, int(t > l)),
                             Pred("cards_total", "under", l, "", 0, int(t < l))]
+                for k, side in enumerate(("home", "away")):
+                    v = m.stats["yellows"][k] + m.stats["reds"][k]
+                    for l in TEAM_CARD_LINES:
+                        out += [Pred("team_cards", f"{side}_over", l, "", 0, int(v > l)),
+                                Pred("team_cards", f"{side}_under", l, "", 0, int(v < l))]
         return out
 
     def _score(self, m: Match, preds, scores, league_scores, bets, base):

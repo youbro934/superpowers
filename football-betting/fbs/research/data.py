@@ -224,6 +224,16 @@ def load_archive(archive_dir: str) -> list[Match]:
                     stats_recs[r["fixture"]] = r
                 elif r.get("kind") == "odds":
                     odds.setdefault(r["fixture"], []).append(r)
+                elif r.get("kind") == "odds_snapshot":
+                    # compact form: expand to flat records; a later "close" replaces an earlier one
+                    lst = odds.setdefault(r["fixture"], [])
+                    if r["snapshot"] == "close":
+                        lst[:] = [x for x in lst if x.get("snapshot") != "close"]
+                    for book, bets in r.get("books", {}).items():
+                        for bet, values in bets.items():
+                            for value, odd in values.items():
+                                lst.append({"snapshot": r["snapshot"], "bookmaker": book, "bet": bet,
+                                            "value": value, "odd": odd})
     out = []
     for fid, r in stats_recs.items():
         g = r.get("goals") or {}

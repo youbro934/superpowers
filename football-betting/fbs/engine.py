@@ -102,8 +102,9 @@ class Engine:
         status = "ok"
         try:
             self._startup()
-            for step in (self.recover, self.settle_open, self.settle_shadow, self.scan_and_bet,
-                         self.collect, self.daily_notices, self.reliability_checks):
+            for step in (self.recover, self.collect, self.settle_open, self.settle_shadow,
+                         self.settle_shadow_entries, self.refresh_predictions, self.scan_and_bet,
+                         self.daily_notices, self.reliability_checks):
                 try:
                     step()
                 except Exception as e:   # keep going; report the failure
@@ -234,6 +235,22 @@ class Engine:
                 kick = parse_iso(leg["kickoff"])
                 if self.now < kick + timedelta(hours=self.cfg.settlement_wait_hours):
                     continue
+                if str(leg["event_id"]).startswith("apif:"):
+                    from .live.settle import settle_leg
+                    r = self._apif_result(leg["event_id"])
+                    res = settle_leg(leg["market"], leg["selection"], leg["line"], r) if r else None
+                    if res:
+                        self.store.x("UPDATE legs SET result=?, home_goals=?, away_goals=?, settled_at=?, source=? "
+                                     "WHERE id=?", (res, r["home_goals"], r["away_goals"], iso(self.now),
+                                                    "api-football", leg["id"]))
+                        self.note(f"leg {leg['id']} {leg['home']} v {leg['away']}: {res}")
+                    elif self.now > kick + timedelta(hours=self.cfg.settlement_alert_hours):
+                        self.notifier.queue(
+                            "Settlement needs attention",
+                            f"No published result/statistic yet for {leg['home']} v {leg['away']} "
+                            f"({leg['market']}). If it never appears: settle {leg['id']} void",
+                            priority="high", tags="hourglass", dedupe_key=f"unsettled:{leg['id']}", dedupe_hours=24)
+                    continue
                 score = self._final_score(leg)
                 result = None
                 stat = None
@@ -352,9 +369,40 @@ class Engine:
         if not ok:
             self.note(f"not scanning: {why}")
             return
-        if not self.odds.enabled:
-            self.note("not scanning: ODDS_API_KEY missing")
+        rejected: dict = {}
+        legs: list[Leg] = []
+        scanned = 0
+        if self.odds.enabled:
+            l1, scanned = self._odds_api_legs(rejected)
+            legs += l1
+        if self.apif.enabled:
+            legs += self._multi_market_legs(rejected)
+        if not self.odds.enabled and not self.apif.enabled:
+            self.note("not scanning: no odds source configured (ODDS_API_KEY / API_FOOTBALL_KEY)")
             return
+        from .live.optimizer import optimize
+        res = optimize(legs, self.cfg, rejected)
+        self.note(f"scanned {scanned} Odds-API league(s); {len(legs)} value selection(s): {res.reason}")
+        detail = json.dumps({"rejected": res.rejected, "qualifying_legs": res.legs_considered,
+                             "top_legs": [asdict(l) for l in sorted(legs, key=lambda l: -l.ev)[:10]],
+                             "shadow_entry": res.shadow.to_dict() if res.shadow else None})
+        if res.shadow:
+            self._record_shadow_entry(res.shadow)
+        if res.staked is None:
+            row = self.store.one("SELECT id FROM decisions WHERE local_date=? AND outcome='NO_BET'", (self.today,))
+            if row:
+                self.store.x("UPDATE decisions SET ts=?, reason=?, detail=? WHERE id=?",
+                             (iso(self.now), res.reason, detail, row["id"]))
+            else:
+                self.store.x("INSERT INTO decisions(ts,local_date,outcome,reason,detail) VALUES(?,?,?,?,?)",
+                             (iso(self.now), self.today, "NO_BET", res.reason, detail))
+            return
+        self.store.x("INSERT INTO decisions(ts,local_date,outcome,reason,detail) VALUES(?,?,?,?,?)",
+                     (iso(self.now), self.today, "BET", res.reason, detail))
+        self.place(res.staked)
+
+    def _odds_api_legs(self, rejected: dict) -> tuple[list[Leg], int]:
+        """The original Odds-API scan (1X2 / totals / extras), gated."""
         start = self.now + timedelta(minutes=self.cfg.min_minutes_to_kickoff)
         window_end = self.now + timedelta(hours=self.cfg.decision_window_hours)
         # 1) free discovery
@@ -383,7 +431,6 @@ class Engine:
             return (not fav, -len(soon))
         mk_cost = len(self.cfg.odds_markets.split(",")) * len(self.cfg.odds_regions.split(","))
         legs: list[Leg] = []
-        rejected: dict = {}
         scanned = 0
         for sport, evs in sorted(upcoming.items(), key=priority):
             soon = [e for e in evs if e.kickoff <= window_end]
@@ -423,23 +470,7 @@ class Engine:
                 legs.extend(evaluate_event(ev, model, comp.code, self.cfg, self.now, None, rejected))
         legs = self._injury_review(legs, rejected)
         legs = self._gate(legs, rejected)
-        decision = decide(legs, self.cfg, rejected)
-        self.note(f"scanned {scanned} league(s), {len(legs)} value leg(s): {decision.reason}")
-        detail = json.dumps({"rejected": decision.rejected, "qualifying_legs": decision.qualifying_legs,
-                             "candidates": decision.candidates,
-                             "top_legs": [asdict(l) for l in sorted(legs, key=lambda l: -l.ev)[:8]]})
-        if decision.candidate is None:
-            row = self.store.one("SELECT id FROM decisions WHERE local_date=? AND outcome='NO_BET'", (self.today,))
-            if row:
-                self.store.x("UPDATE decisions SET ts=?, reason=?, detail=? WHERE id=?",
-                             (iso(self.now), decision.reason, detail, row["id"]))
-            else:
-                self.store.x("INSERT INTO decisions(ts,local_date,outcome,reason,detail) VALUES(?,?,?,?,?)",
-                             (iso(self.now), self.today, "NO_BET", decision.reason, detail))
-            return
-        self.store.x("INSERT INTO decisions(ts,local_date,outcome,reason,detail) VALUES(?,?,?,?,?)",
-                     (iso(self.now), self.today, "BET", decision.reason, detail))
-        self.place(decision.candidate)
+        return legs, scanned
 
     def _gate(self, legs: list[Leg], rejected: dict) -> list[Leg]:
         """Only markets that passed out-of-sample validation may be staked; the rest are logged as shadow."""
@@ -466,15 +497,29 @@ class Engine:
                  l.p_used, l.ev, "market not validated"))
         return kept
 
+    def _collector(self):
+        from .research.collector import Collector
+        return Collector(self.cfg.api_football_key, os.path.join(self.dir, "archive", "api-football"), self.store,
+                         self.http, now=self._now, cache_dir=os.path.join(self.cache_dir, "current-odds"),
+                         refresh_hours=self.cfg.apif_odds_refresh_hours)
+
+    def _open_fixture_ids(self) -> set:
+        ids = set()
+        for r in self.store.q("SELECT event_id FROM legs WHERE result='pending' AND event_id LIKE 'apif:%'"):
+            ids.add(int(r[0].split(":")[1]))
+        for r in self.store.q("SELECT legs FROM shadow_entries WHERE result IS NULL"):
+            for l in json.loads(r[0]):
+                if str(l["event_id"]).startswith("apif:"):
+                    ids.add(int(l["event_id"].split(":")[1]))
+        return ids
+
     def collect(self):
-        """Forward archive of odds/stats/team news for markets without free history (API-Football)."""
+        """Current odds, fixtures, statistics and team news from API-Football (free plan budget)."""
         if not self.apif.enabled:
             return
-        from .research.collector import Collector
-        c = Collector(self.cfg.api_football_key, os.path.join(self.dir, "archive", "api-football"), self.store,
-                      self.http, now=self._now)
+        c = self._collector()
         try:
-            done = c.run()
+            done = c.run(self._open_fixture_ids())
             self.store.provider_ok("api-football:collector")
             if any(done.values()):
                 self.note(f"collected {done}")
@@ -482,6 +527,180 @@ class Engine:
             if "budget" in str(e):
                 return
             self.provider_error("api-football:collector", e)
+
+    # ------------------------------------------------------- live multi-market
+    def refresh_predictions(self):
+        """Model parameters for upcoming fixtures (rebuilt when missing or older than 20 h)."""
+        if not self.apif.enabled:
+            return
+        need = []
+        for fx in self._collector().upcoming():
+            r = self.store.one("SELECT created_at FROM predictions WHERE fixture_id=?", (fx["id"],))
+            if r is None or self.now - parse_iso(r[0]) > timedelta(hours=20):
+                need.append(fx)
+        if not need:
+            return
+        try:
+            from .live.predictor import LivePredictor
+            from .research.data import ResearchData
+        except ImportError as e:      # numpy missing
+            self.note(f"predictor unavailable: {e}")
+            return
+        pred = LivePredictor(ResearchData(os.path.join(self.cache_dir, "research"), http=self.http),
+                             os.path.join(self.dir, "archive", "api-football"), self.now.date()).build()
+        made = 0
+        for fx in need:
+            params = pred.predict(fx)
+            if params is None:
+                continue
+            made += 1
+            self.store.x("INSERT INTO predictions(fixture_id,created_at,league,home,away,kickoff,model_version,params) "
+                         "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET created_at=excluded.created_at, "
+                         "model_version=excluded.model_version, params=excluded.params",
+                         (fx["id"], iso(self.now), params["league"], params["teams"][0], params["teams"][1],
+                          fx["kickoff"], pred.version, json.dumps(params)))
+        self.store.x("DELETE FROM predictions WHERE kickoff < ?", (iso(self.now - timedelta(days=30)),))
+        self.note(f"predictions: {made}/{len(need)} upcoming fixture(s) modelled ({pred.n_matches} matches of history)")
+
+    def _multi_market_legs(self, rejected: dict) -> list[Leg]:
+        from .live.odds import prices
+        from .live.probs import model_for, probability
+        from .research.gate import selection_status
+        gate = self.store.get("gate")
+        col = self._collector()
+        start = self.now + timedelta(minutes=self.cfg.min_minutes_to_kickoff)
+        end = self.now + timedelta(hours=self.cfg.decision_window_hours)
+        legs, obs = [], []
+        unmapped_total: dict = {}
+
+        def rej(k):
+            rejected[k] = rejected.get(k, 0) + 1
+
+        for fx in col.upcoming():
+            ko = parse_iso(fx["kickoff"])
+            if not (start <= ko <= end):
+                continue
+            row = self.store.one("SELECT params FROM predictions WHERE fixture_id=?", (fx["id"],))
+            if row is None:
+                rej("fixture not modelled (no comparable history)")
+                continue
+            snap = col.current(fx["id"])
+            if snap is None:
+                rej("no current odds")
+                continue
+            age = self.now - parse_iso(snap["fetched_at"])
+            if age > timedelta(minutes=self.cfg.apif_odds_max_age_minutes):
+                rej("odds too old")
+                continue
+            params = json.loads(row[0])
+            quotes, unmapped = prices(snap, self.cfg.allowed_bookmakers)
+            # learning log: opening view and the last view before kick-off (enough for CLV)
+            if not self.store.get(f"obs:{fx['id']}:open"):
+                obs_label = "open"
+            elif ko - self.now <= timedelta(hours=2, minutes=30) and not self.store.get(f"obs:{fx['id']}:close"):
+                obs_label = "close"
+            else:
+                obs_label = None
+            for k, v in unmapped.items():
+                unmapped_total[k] = unmapped_total.get(k, 0) + v
+            fav = is_favorite(fx["home"]) or is_favorite(fx["away"])
+            for (fam, sel, line), q in quotes.items():
+                p = probability(params, fam, sel, line)
+                if p is None:
+                    continue
+                ev = p * q.best - 1
+                status = selection_status(gate, fam, sel, line, model_for(fam))
+                if obs_label:
+                    obs.append({"fixture": fx["id"], "snapshot": obs_label, "family": fam, "sel": sel, "line": line, "p": round(p, 4),
+                                "price": q.best, "book": q.bookmaker, "fair_p": q.fair_p, "n_books": q.n_books,
+                                "priced_at": q.fetched_at, "status": status})
+                if status in ("REJECTED", "UNTESTED"):
+                    if ev >= self.cfg.min_leg_edge:
+                        rej(f"value but market {status.lower()}")
+                    continue
+                need = self.cfg.min_leg_edge
+                if fam.split("_")[0] in ("corners", "cards", "fouls", "yellows", "red") or \
+                        fam.startswith("team_corners") or fam.startswith("team_cards") or fam.startswith("team_fouls"):
+                    need += self.cfg.secondary_market_extra_edge
+                if q.best < self.cfg.min_leg_odds:
+                    continue
+                if p < self.cfg.min_leg_prob:
+                    continue
+                if q.fair_p is not None and abs(p - q.fair_p) > self.cfg.max_model_market_gap:
+                    rej("model/market disagreement too large")
+                    continue
+                if q.n_books < 2:
+                    rej("price quoted by a single bookmaker")
+                    continue
+                if ev < need:
+                    continue
+                legs.append(Leg(f"apif:{fx['id']}", "", params["league"], params["teams"][0], params["teams"][1],
+                                fx["kickoff"], fam, sel, line, q.best, q.bookmaker, round(p, 4),
+                                round(q.fair_p, 4) if q.fair_p is not None else None, round(p, 4), round(ev, 4),
+                                fav, status, q.fetched_at))
+        if obs:
+            self._archive("observations", obs)
+        if unmapped_total:
+            self.store.set("apif_unmapped_bets", dict(sorted(unmapped_total.items(), key=lambda kv: -kv[1])[:40]))
+        return legs
+
+    def _archive(self, kind: str, recs: list[dict]):
+        """Every prediction/price pair, once per price snapshot (learning data)."""
+        import gzip
+        d = os.path.join(self.dir, "archive", kind)
+        os.makedirs(d, exist_ok=True)
+        fresh = [r for r in recs if not self.store.get(f"obs:{r['fixture']}:{r['snapshot']}")]
+        if not fresh:
+            return
+        for k in {f"obs:{r['fixture']}:{r['snapshot']}" for r in fresh}:
+            self.store.set(k, True)
+        with gzip.open(os.path.join(d, f"{self.now.date().isoformat()}.jsonl.gz"), "at", encoding="utf-8") as f:
+            for r in fresh:
+                f.write(json.dumps(r | {"logged_at": iso(self.now)}, separators=(",", ":")) + "\n")
+
+    def _record_shadow_entry(self, cand):
+        n_today = self.store.one("SELECT COUNT(*) FROM shadow_entries WHERE local_date=?", (self.today,))[0]
+        if n_today >= self.cfg.max_bets_per_day:
+            return
+        legs = [asdict(l) for l in cand.legs]
+        # one shadow entry per match per day, mirroring the sequential staking rules
+        used = {l["event_id"] for r in self.store.q("SELECT legs FROM shadow_entries WHERE local_date=?",
+                                                     (self.today,)) for l in json.loads(r[0])}
+        if any(l["event_id"] in used for l in legs):
+            return
+        sid = self.store.x("INSERT INTO shadow_entries(created_at,local_date,odds,prob,ev,legs) VALUES(?,?,?,?,?,?)",
+                           (iso(self.now), self.today, cand.odds, cand.prob, cand.ev, json.dumps(legs)))
+        txt = "\n".join(f"- {l.label()} [{l.bookmaker}, {l.status}] p={l.p_used:.0%}" for l in cand.legs)
+        self.notifier.queue(f"SHADOW entry @ {cand.odds:.2f} (not staked)",
+                            f"{txt}\n\nModel p {cand.prob:.1%}, EV {cand.ev:+.1%}. Uses market(s) still in SHADOW: "
+                            "tracked to build evidence, no money involved.", tags="mag", priority="low",
+                            dedupe_key=f"shadow_entry:{sid}")
+
+    def _apif_result(self, event_id: str):
+        fid = int(event_id.split(":")[1])
+        r = self.store.one("SELECT * FROM fixture_results WHERE fixture_id=?", (fid,))
+        if r is None or r["home_goals"] is None:
+            return None
+        return r
+
+    def settle_shadow_entries(self):
+        from .live.settle import settle_leg
+        for e in self.store.q("SELECT * FROM shadow_entries WHERE result IS NULL"):
+            legs = json.loads(e["legs"])
+            results = []
+            for l in legs:
+                if parse_iso(l["kickoff"]) + timedelta(hours=self.cfg.settlement_wait_hours) > self.now:
+                    results.append("pending")
+                    continue
+                r = self._apif_result(l["event_id"]) if str(l["event_id"]).startswith("apif:") else None
+                res = settle_leg(l["market"], l["selection"], l["line"], r) if r else None
+                if res is None and self.now - parse_iso(l["kickoff"]) > timedelta(days=4):
+                    res = "void"          # result/statistic never published: excluded from evidence
+                results.append(res or "pending")
+            outcome, odds = bet_outcome([{"result": x, "odds": l["odds"]} for x, l in zip(results, legs)])
+            if outcome:
+                self.store.x("UPDATE shadow_entries SET result=?, settled_at=? WHERE id=?",
+                             (outcome, iso(self.now), e["id"]))
 
     def settle_shadow(self):
         """Settle shadow selections with free result sources so forward evidence accumulates."""

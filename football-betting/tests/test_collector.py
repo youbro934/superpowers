@@ -25,7 +25,7 @@ class FakeAPIF:
         if url.endswith("/fixtures"):
             d = params["date"]
             fx = [
-                {"fixture": {"id": 1, "date": f"{d}T19:00:00+00:00", "referee": "R. Claus",
+                {"fixture": {"id": 1, "date": f"{d}T20:00:00+00:00", "referee": "R. Claus",
                              "status": {"short": "FT" if d < "2026-11-07" else "NS"}},
                  "league": {"id": 71}, "teams": {"home": {"name": "Flamengo"}, "away": {"name": "Palmeiras"}},
                  "goals": {"home": 2, "away": 1}, "score": {"halftime": {"home": 1, "away": 0}}},
@@ -36,9 +36,11 @@ class FakeAPIF:
                 f["fixture"]["id"] += {"2026-11-06": 100, "2026-11-07": 0, "2026-11-08": 200}[d]
             return Response(200, {}, json.dumps({"errors": [], "response": fx}).encode())
         if url.endswith("/odds"):
-            return Response(200, {}, json.dumps({"errors": [], "response": [{"bookmakers": [{"name": "Bet365", "bets": [
-                {"name": "Corners Over Under", "values": [{"value": "Over 9.5", "odd": "1.85"}]},
-                {"name": "Cards Over/Under", "values": [{"value": "Over 4.5", "odd": "2.10"}]}]}]}]}).encode())
+            fid = {"2026-11-07": 1, "2026-11-08": 201}[params["date"]]
+            return Response(200, {}, json.dumps({"errors": [], "paging": {"current": 1, "total": 1}, "response": [
+                {"fixture": {"id": fid}, "bookmakers": [{"name": "Bet365", "bets": [
+                    {"name": "Corners Over Under", "values": [{"value": "Over 9.5", "odd": "1.85"}]},
+                    {"name": "Cards Over/Under", "values": [{"value": "Over 4.5", "odd": "2.10"}]}]}]}]}).encode())
         if url.endswith("/fixtures/statistics"):
             return Response(200, {}, json.dumps({"errors": [], "response": [
                 {"team": {"name": "Flamengo"}, "statistics": [{"type": "Corner Kicks", "value": 7},
@@ -57,25 +59,30 @@ class CollectorTests(unittest.TestCase):
         c = Collector("k", os.path.join(d, "arch"), store, http=api, now=NOW)
         done = c.run()
         self.assertEqual(done["stats"], 1)          # yesterday's Flamengo match
-        self.assertGreaterEqual(done["odds_open"], 1)
+        self.assertEqual(done["fixtures_priced"], 2)   # today + tomorrow, one request per league-day
+        self.assertEqual(done["odds_requests"], 2)
+        self.assertEqual(c.current(1)["books"]["Bet365"]["Corners Over Under"]["Over 9.5"], 1.85)
         with gzip.open(os.path.join(d, "arch", "2026-11-07.jsonl.gz"), "rt") as f:
             recs = [json.loads(l) for l in f]
-        odds = [r for r in recs if r["kind"] == "odds"]
-        self.assertTrue(any(r["bet"] == "Corners Over Under" and r["odd"] == 1.85 for r in odds))
+        snaps = [r for r in recs if r["kind"] == "odds_snapshot"]
+        self.assertEqual({r["snapshot"] for r in snaps}, {"open"})
+        row = store.one("SELECT * FROM fixture_results WHERE fixture_id=101")
+        self.assertEqual((row["home_goals"], row["away_goals"]), (2, 1))
         self.assertTrue(all(r["source"] == "api-football" and r["fetched_at"] for r in recs))
         st = [r for r in recs if r["kind"] == "stats"][0]
         self.assertEqual(st["stats"]["home_corners"], 7.0)
         self.assertEqual(st["stats"]["home_possession"], 58.0)
         self.assertNotIn("home_fouls", st["stats"])     # missing is never filled in
         self.assertFalse(any(r.get("league") == 999 for r in recs))   # non-priority league skipped
-        # second pass: no second "open" snapshot; kick-off is 1 h away so the "close" snapshot is due
+        # an hour later: the league-day with a kick-off within 2.5 h refreshes and archives "close"
+        c2 = Collector("k", os.path.join(d, "arch"), store, http=api, now=NOW + timedelta(minutes=61))
         n_calls = len(api.calls)
-        c.run()
+        c2.run()
         self.assertEqual(sum(1 for k, _ in api.calls[n_calls:] if k == "odds"), 1)
         self.assertTrue(store.get("apif_odds:1:close"))
         n_calls = len(api.calls)
-        c.run()
-        self.assertEqual(sum(1 for k, _ in api.calls[n_calls:] if k == "odds"), 0)
+        c2.run()
+        self.assertEqual(sum(1 for k, _ in api.calls[n_calls:] if k == "odds"), 0)   # nothing due
         store.close()
 
     def test_budget_stops_requests(self):

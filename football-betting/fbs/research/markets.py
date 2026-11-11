@@ -11,13 +11,14 @@ from .glm import convolve, p_over
 GOAL_LINES = (0.5, 1.5, 2.5, 3.5, 4.5)
 TEAM_GOAL_LINES = (0.5, 1.5, 2.5)
 HT_LINES = (0.5, 1.5)
-CORNER_LINES = (7.5, 8.5, 9.5, 10.5, 11.5, 12.5)
-TEAM_CORNER_LINES = (2.5, 3.5, 4.5, 5.5, 6.5)
-FOUL_LINES = (18.5, 20.5, 22.5, 24.5, 26.5)
-TEAM_FOUL_LINES = (8.5, 9.5, 10.5, 11.5, 12.5, 13.5)
-YELLOW_LINES = (2.5, 3.5, 4.5, 5.5)
-TEAM_YELLOW_LINES = (0.5, 1.5, 2.5)
-CARD_LINES = (2.5, 3.5, 4.5, 5.5, 6.5)
+CORNER_LINES = tuple(x + 0.5 for x in range(2, 14))          # 2.5 .. 13.5
+TEAM_CORNER_LINES = tuple(x + 0.5 for x in range(0, 9))      # 0.5 .. 8.5
+FOUL_LINES = tuple(x + 0.5 for x in range(14, 31, 2))        # 14.5 .. 30.5
+TEAM_FOUL_LINES = tuple(x + 0.5 for x in range(6, 17))       # 6.5 .. 16.5
+YELLOW_LINES = tuple(x + 0.5 for x in range(0, 8))           # 0.5 .. 7.5
+TEAM_YELLOW_LINES = (0.5, 1.5, 2.5, 3.5)
+CARD_LINES = tuple(x + 0.5 for x in range(0, 9))             # 0.5 .. 8.5
+TEAM_CARD_LINES = (0.5, 1.5, 2.5, 3.5)
 
 # research family -> production market key used by the live decision engine
 PRODUCTION_KEY = {
@@ -192,8 +193,9 @@ def attach_archive_prices(preds: list[Pred], m):
     if not recs:
         return
     taken, close = {}, {}
+    from ..live.odds import map_bet
     for r in recs:
-        k = _apif_key(r.get("bet", ""), r.get("value", ""))
+        k = map_bet(r.get("bet", ""), r.get("value", ""))
         if not k:
             continue
         (taken if r.get("snapshot") == "open" else close).setdefault(k, {})[r.get("bookmaker")] = r["odd"]

@@ -96,3 +96,28 @@ def allowed(gate: dict | None, market: str, selection: str, line) -> bool:
         if m == market and s == selection and (l is None or line is None or abs(l - line) < 1e-9):
             return True
     return False
+
+
+def selection_status(gate: dict | None, family: str, sel: str, line, model: str) -> str:
+    """PASSED / SHADOW / REJECTED for one live selection. A line the research did not
+    validate can at most be SHADOW, and only inside a SHADOW or PASSED family."""
+    if not gate:
+        return "UNTESTED"
+    g = gate.get("markets", {}).get(family)
+    if not g:
+        return "UNTESTED"
+
+    def has(lst):
+        for s, l, m in lst:
+            if s == sel and m == model and ((l is None and line is None) or
+                                            (l is not None and line is not None and abs(l - line) < 1e-9)):
+                return True
+        return False
+
+    if has(g.get("passed", [])):
+        return "PASSED"
+    if has(g.get("shadow", [])):
+        return "SHADOW"
+    if g.get("status") in ("PASSED", "SHADOW") and family not in HIST_PRICED:
+        return "SHADOW"
+    return "REJECTED"

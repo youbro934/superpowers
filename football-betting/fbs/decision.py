@@ -40,6 +40,8 @@ class Leg:
     p_used: float
     ev: float
     favorite: bool
+    status: str = "PASSED"        # promotion-gate status of this selection
+    priced_at: str = ""           # timestamp of the price used
 
     def label(self) -> str:
         line = f" {self.line:g}" if self.line is not None else ""

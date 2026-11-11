@@ -80,6 +80,19 @@ def write(engine) -> str:
     ledger_tbl = _t(ledger, [("Time (UTC)", lambda r: e(r["ts"][:16].replace("T", " "))),
                              ("Type", lambda r: e(r["kind"])), ("Amount", lambda r: eur(r["amount_cents"])),
                              ("Cash balance", lambda r: eur(r["balance_cents"])), ("Note", lambda r: e(r["note"] or ""))])
+    shadow = s.q("SELECT * FROM shadow_entries ORDER BY id DESC LIMIT 60")
+    sh_done = [r for r in shadow if r["result"] in ("WON", "LOST")]
+    sh_roi = (sum((r["odds"] - 1) if r["result"] == "WON" else -1 for r in sh_done) / len(sh_done)) if sh_done else None
+
+    def sh_legs(r):
+        import json as _j
+        return "<br>".join(e(f"{l['home']} v {l['away']} — {l['market']} {l['selection']}"
+                             f"{'' if l['line'] is None else ' ' + format(l['line'], 'g')} @ {l['odds']:.2f} "
+                             f"({l.get('status', '')})") for l in _j.loads(r["legs"]))
+    shadow_tbl = _t(shadow, [("Date", lambda r: e(r["local_date"])), ("Odds", lambda r: f"{r['odds']:.2f}"),
+                             ("p", lambda r: f"{r['prob']:.0%}"), ("EV", lambda r: f"{r['ev']:+.1%}"),
+                             ("Result", lambda r: e(r["result"] or "pending")), ("Selections", sh_legs)],
+                    wrap=("Selections",))
     decisions = s.q("SELECT * FROM decisions ORDER BY id DESC LIMIT 30")
     dec_tbl = _t(decisions, [("Date", lambda r: e(r["local_date"])), ("Outcome", lambda r: e(r["outcome"])),
                              ("Reason", lambda r: e(r["reason"] or ""))], wrap=("Reason",))
@@ -125,6 +138,9 @@ def write(engine) -> str:
 deposits are allowed. Reaching €500 from €10 at odds 1.30–1.40 needs 12–15 wins in a row.</div>
 <h2>Favorite teams — upcoming</h2><div class="card">{fav_html}</div>
 <h2>Bets</h2>{bets_tbl}
+<h2>Shadow entries (not staked)</h2><div class="muted">Entries that need a market still in SHADOW.
+Tracked to build forward evidence. {len(sh_done)} settled{'' if sh_roi is None else f', flat ROI {sh_roi:+.1%}'}
+(small samples prove nothing).</div>{shadow_tbl}
 <h2>Decisions</h2>{dec_tbl}
 <h2>Ledger</h2>{ledger_tbl}
 <h2>Model reliability</h2><div class="card">{e(calib_html)}</div>
