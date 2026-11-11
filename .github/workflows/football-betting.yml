@@ -11,13 +11,17 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "run | status | continue | backtest | research | notify-test"
+        description: "run | status | continue | backtest | research | notify-test | start | stop | confirm | reject | settle-bet"
         required: true
         default: run
         type: choice
-        options: [run, status, continue, backtest, research, notify-test]
+        options: [run, status, continue, backtest, research, notify-test, start, stop, confirm, reject, settle-bet]
       confirm:
         description: "For 'continue' type exactly: CONTINUE"
+        required: false
+        default: ""
+      payload:
+        description: "JSON for confirm / reject / settle-bet (sent by the iPhone app)"
         required: false
         default: ""
   push:
@@ -58,7 +62,8 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-      FBS_EXECUTION_MODE: ${{ vars.FBS_EXECUTION_MODE || 'paper' }}
+      FBS_EXECUTION_MODE: ${{ vars.FBS_EXECUTION_MODE || 'manual' }}
+      FBS_APP_URL: ${{ vars.FBS_APP_URL || format('https://{0}.github.io/{1}/app/', github.repository_owner, github.event.repository.name) }}
       FBS_ALLOWED_BOOKMAKERS: ${{ vars.FBS_ALLOWED_BOOKMAKERS }}
       FBS_DASHBOARD_URL: ${{ vars.FBS_DASHBOARD_URL }}
       FBS_DATA_DIR: ${{ github.workspace }}/state
@@ -96,13 +101,22 @@ jobs:
         env:
           CMD: ${{ github.event.schedule == '43 3 * * 1' && 'research' || github.event.inputs.command || 'run' }}
           CONFIRM: ${{ github.event.inputs.confirm }}
+          PAYLOAD: ${{ github.event.inputs.payload }}
         run: |
           case "$CMD" in
             continue) python -m fbs continue "$CONFIRM" ;;
             backtest) python -m fbs backtest 365 ;;
             research) python -m fbs research 24 ;;
+            confirm|reject|settle-bet) python -m fbs "$CMD" "$PAYLOAD" ;;
             *) python -m fbs "$CMD" ;;
           esac
+
+      - name: Publish the iPhone app next to the state
+        if: always()
+        run: |
+          mkdir -p state/app
+          cp football-betting/pwa/* state/app/
+          touch state/.nojekyll
 
       - name: Save provider cache
         if: always()

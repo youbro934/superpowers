@@ -7,6 +7,10 @@
   backtest [DAYS]     walk-forward backtest on historical closing odds (goal model only)
   research [MONTHS]   per-market chronological backtests + promotion gate (needs numpy)
   notify-test         send a test push notification
+  start | stop        resume / pause issuing opportunities (settlement continues)
+  confirm JSON        record a bet the owner placed: {"id","stake","odds","bookmaker","reference"}
+  reject JSON         decline an opportunity: {"id"}
+  settle-bet JSON     manual settlement when no verified result exists: {"bet_id","result"}
 """
 from __future__ import annotations
 
@@ -104,6 +108,40 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         eng.notifier.flush()
         store.commit()
         return 0
+    if cmd in ("start", "stop"):
+        eng.store.set("ai_enabled", cmd == "start")
+        eng.notifier.queue("AI started" if cmd == "start" else "AI stopped",
+                           "Scanning for opportunities resumed." if cmd == "start" else
+                           "No new opportunities will be issued. Open bets are still tracked and settled.",
+                           tags="arrow_forward" if cmd == "start" else "stop_button")
+        return _finish(eng, f"AI {'started' if cmd == 'start' else 'stopped'}")
+    if cmd in ("confirm", "reject"):
+        try:
+            payload = json.loads(args[0]) if args else {}
+        except ValueError:
+            print("payload must be JSON")
+            return 2
+        ok, msg = (eng.opps.confirm if cmd == "confirm" else eng.opps.reject)(payload)
+        if not ok:
+            eng.notifier.queue(f"{cmd.title()} not recorded", msg, tags="warning")
+        return _finish(eng, msg, 0 if ok else 1)
+    if cmd == "settle-bet":
+        # manual settlement of a whole bet when no verified result can be obtained
+        try:
+            payload = json.loads(args[0])
+            bet = store.one("SELECT * FROM bets WHERE id=?", (int(payload["bet_id"]),))
+            res = payload["result"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            print('usage: settle-bet \'{"bet_id": 1, "result": "won|lost|void"}\'')
+            return 2
+        if bet is None or bet["status"] != "OPEN" or res not in ("won", "lost", "void"):
+            return _finish(eng, "bet not open or bad result", 1)
+        store.x("UPDATE legs SET result=?, settled_at=?, source='manual' WHERE bet_id=? AND result='pending'",
+                (res if res != "won" else "won", iso(utcnow()), bet["id"]))
+        store.x("UPDATE bets SET settle_source='manual' WHERE id=?", (bet["id"],))
+        store.commit()
+        eng.settle_open()
+        return _finish(eng, f"bet {bet['id']} settled manually as {res}")
     if cmd == "research":
         return _research(eng, args)
     if cmd == "notify-test":
@@ -116,6 +154,18 @@ def _dispatch(eng: Engine, cmd: str, args: list[str]) -> int:
         return 0 if sent else 1
     print(__doc__)
     return 2
+
+
+def _finish(eng: Engine, msg: str, code: int = 0) -> int:
+    from . import dashboard
+    from .state_export import write_state
+    eng.store.commit()
+    eng.notifier.flush()
+    eng.store.commit()
+    dashboard.write(eng)
+    write_state(eng)
+    print(msg)
+    return code
 
 
 def _research(eng: Engine, args: list[str]) -> int:

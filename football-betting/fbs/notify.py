@@ -32,15 +32,17 @@ class Notifier:
         return out
 
     def queue(self, title: str, body: str, priority: str = "default", tags: str = "",
-              dedupe_key: str | None = None, dedupe_hours: float | None = None) -> bool:
+              dedupe_key: str | None = None, dedupe_hours: float | None = None,
+              click: str | None = None, actions: list | None = None) -> bool:
         """Queue a message. With dedupe_key, skip if the same key was queued recently
         (dedupe_hours) or ever (dedupe_hours=None)."""
         if dedupe_key:
             r = self.s.one("SELECT ts FROM notifications WHERE dedupe_key=? ORDER BY id DESC LIMIT 1", (dedupe_key,))
             if r and (dedupe_hours is None or utcnow() - parse_iso(r["ts"]) < timedelta(hours=dedupe_hours)):
                 return False
-        self.s.x("INSERT INTO notifications(ts,dedupe_key,title,body,priority,tags) VALUES(?,?,?,?,?,?)",
-                 (iso(utcnow()), dedupe_key, title, body, priority, tags))
+        extra = json.dumps({"click": click, "actions": actions}) if (click or actions) else None
+        self.s.x("INSERT INTO notifications(ts,dedupe_key,title,body,priority,tags,extra) VALUES(?,?,?,?,?,?,?)",
+                 (iso(utcnow()), dedupe_key, title, body, priority, tags, extra))
         return True
 
     def flush(self) -> tuple[int, int]:
@@ -78,8 +80,11 @@ class Notifier:
         msg = {"topic": self.cfg.ntfy_topic, "title": n["title"], "message": n["body"], "priority": prio}
         if n["tags"]:
             msg["tags"] = [t for t in n["tags"].split(",") if t]
-        if self.cfg.dashboard_url:
-            msg["click"] = self.cfg.dashboard_url
+        extra = json.loads(n["extra"]) if "extra" in n.keys() and n["extra"] else {}
+        if extra.get("click") or self.cfg.dashboard_url:
+            msg["click"] = extra.get("click") or self.cfg.dashboard_url
+        if extra.get("actions"):
+            msg["actions"] = extra["actions"][:3]
         headers = {"Content-Type": "application/json"}
         if self.cfg.ntfy_token:
             headers["Authorization"] = f"Bearer {self.cfg.ntfy_token}"

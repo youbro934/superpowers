@@ -23,6 +23,7 @@ def cfg(**kw):
     c.football_data_org_key = ""        # results come from the Odds API scores fake
     c.ntfy_topic = "test-topic"
     c.min_bet_edge = 0.02               # plumbing test, not a threshold test
+    c.execution_mode = "paper"          # these tests cover the simulated-placement mode
     for k, v in kw.items():
         setattr(c, k, v)
     return c

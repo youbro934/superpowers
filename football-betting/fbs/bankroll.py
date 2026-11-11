@@ -102,6 +102,21 @@ class Bankroll:
         self._ledger("STAKE", -stake, bet_id, f"all-in stake @ {odds:.2f}")
         return bet_id
 
+    def reserve_amount(self, client_ref: str, local_date: str, slot: int, mode: str, odds: float,
+                       prob: float, ev: float, stake: int) -> int:
+        """Manual bets: record the stake the owner actually placed (never more than the bankroll)."""
+        ok, why = self.can_bet(local_date)
+        if not ok:
+            raise BankrollError(why)
+        if stake <= 0 or stake > self.balance:
+            raise BankrollError("stake must be positive and within the bankroll")
+        bet_id = self.s.x(
+            "INSERT INTO bets(client_ref,created_at,local_date,slot,mode,status,stake_cents,odds,prob,ev) "
+            "VALUES(?,?,?,?,?,'PLACING',?,?,?,?)",
+            (client_ref, iso(utcnow()), local_date, slot, mode, stake, odds, prob, ev))
+        self._ledger("STAKE", -stake, bet_id, f"stake @ {odds:.2f} (placed manually by owner)")
+        return bet_id
+
     def confirm(self, bet_id: int, external_ref: str):
         self.s.x("UPDATE bets SET status='OPEN', external_ref=? WHERE id=?", (external_ref, bet_id))
 
@@ -139,7 +154,8 @@ class Bankroll:
             self.s.set("status", STOPPED_TARGET)
         if bal < self.cfg.target_stop_cents and self.s.get("target_acknowledged"):
             self.s.set("target_acknowledged", False)   # re-arm for the next crossing
-        if self.status == ACTIVE and bal < self.cfg.min_stake_cents and not self.open_bets():
+        if self.status == ACTIVE and bal < self.cfg.min_stake_cents and not self.open_bets() and \
+                not self.s.one("SELECT 1 FROM bets WHERE status IN ('PLACING','OPEN')"):
             self.s.set("status", BUSTED)
 
     def resume(self, command: str) -> bool:

@@ -152,6 +152,7 @@ class LiveEngineTests(unittest.TestCase):
         self.cfg = Settings()
         self.cfg.api_football_key = "k"
         self.cfg.ntfy_topic = "t"
+        self.cfg.execution_mode = "paper"
 
     def _prepare(self, statuses):
         """Model the two fixtures, then price chosen selections ~8% above the model probability."""
@@ -230,3 +231,121 @@ class LiveEngineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ManualFlowTests(LiveEngineTests):
+    """iPhone flow: opportunity card -> owner places bet at Bet365 -> confirms -> settled -> bankroll."""
+
+    test_full_day_cross_match_entry_staked_then_settled = None   # paper-mode test, covered above
+
+    def setUp(self):
+        super().setUp()
+        self.cfg.execution_mode = "manual"
+        self.cfg.app_url = "https://example.github.io/superpowers/app/"
+
+    def _issue(self):
+        world, picks = self._prepare(["PASSED", "PASSED"])
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=5))
+        out = eng.run()
+        opp = eng.store.one("SELECT * FROM opportunities")
+        eng.close()
+        return world, picks, opp, out
+
+    def test_card_issued_not_a_bet(self):
+        world, picks, opp, out = self._issue()
+        self.assertIsNotNone(opp, out["log"])
+        self.assertEqual(opp["status"], "OPEN")
+        self.assertEqual(opp["stake_cents"], 1000)
+        self.assertEqual(out["bankroll"], 1000)                     # nothing staked until the owner confirms
+        eng = Engine(self.cfg, self.dir, now=NOW)
+        self.assertEqual(eng.store.one("SELECT COUNT(*) FROM bets")[0], 0)
+        n = eng.store.one("SELECT * FROM notifications WHERE title LIKE 'NEW OPPORTUNITY%'")
+        eng.close()
+        self.assertIn("potential return", n["body"])
+        self.assertIn("Odds verified", n["body"])
+        extra = json.loads(n["extra"])
+        self.assertEqual(extra["actions"][0]["url"], "https://www.bet365.com/")
+        self.assertTrue(extra["click"].endswith("#opp=" + opp["id"]))
+        state = json.load(open(os.path.join(self.dir, "state.json")))
+        self.assertEqual(state["opportunities"][0]["id"], opp["id"])
+        self.assertTrue(all(l["label"] and l["why"] for l in state["opportunities"][0]["legs"]))
+
+    def test_no_duplicate_and_one_at_a_time(self):
+        world, picks, opp, out = self._issue()
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=20))
+        out = eng.run()
+        n = eng.store.one("SELECT COUNT(*) FROM opportunities")[0]
+        eng.close()
+        self.assertEqual(n, 1)
+        self.assertIn("not scanning: an opportunity is waiting for your decision", out["log"])
+
+    def test_confirm_settle_and_reinvest(self):
+        from fbs.__main__ import _dispatch
+        world, picks, opp, out = self._issue()
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=30))
+        bad = {"id": opp["id"], "stake": 25, "odds": 1.35}
+        self.assertEqual(_dispatch(eng, "confirm", [json.dumps(bad)]), 1)          # beyond bankroll: refused
+        good = {"id": opp["id"], "stake": 10, "odds": 1.33, "bookmaker": "Bet365", "reference": "ABC123"}
+        self.assertEqual(_dispatch(eng, "confirm", [json.dumps(good)]), 0)
+        self.assertEqual(_dispatch(eng, "confirm", [json.dumps(good)]), 1)         # duplicate ignored
+        bet = eng.store.one("SELECT * FROM bets")
+        self.assertEqual((bet["mode"], bet["stake_cents"], bet["odds"], bet["reference"]), ("manual", 1000, 1.33, "ABC123"))
+        eng.close()
+        world.final = True
+        e = Engine(self.cfg, self.dir, http=world, now=NOW)
+        e.store.x("DELETE FROM meta WHERE key LIKE 'apif_fixtures:%'")
+        e.store.commit()
+        e.close()
+        eng = Engine(self.cfg, self.dir, http=world, now=datetime(2026, 11, 7, 19, 0, tzinfo=timezone.utc))
+        out = eng.run()
+        bet = eng.store.one("SELECT * FROM bets")
+        eng.close()
+        won = (2 + 1 > picks[1][2]) and (6 + 2 > picks[2][2])
+        self.assertEqual(bet["status"], "WON" if won else "LOST", out["log"])
+        if won:
+            self.assertEqual(bet["return_cents"], 1330)        # paid at the odds actually accepted
+            self.assertEqual(out["bankroll"], 1330)             # 100% reinvested: next suggested stake
+
+    def test_expiry_and_odds_change(self):
+        world, picks, opp, out = self._issue()
+        # odds move down: the card is withdrawn
+        for fid in world.odds:
+            for bm in world.odds[fid]:
+                for v in bm["bets"][0]["values"]:
+                    if v["value"].startswith("Over"):
+                        v["odd"] = "1.03"
+        e = Engine(self.cfg, self.dir, now=NOW)
+        e.store.x("DELETE FROM meta WHERE key LIKE 'apif_oddsq:%'")
+        e.store.commit()
+        e.close()
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(hours=1, minutes=5))
+        eng.run()
+        o = eng.store.one("SELECT * FROM opportunities WHERE id=?", (opp["id"],))
+        eng.close()
+        self.assertEqual(o["status"], "CHANGED")
+        self.assertTrue(any("withdrawn" in t for t in world.pushes), world.pushes)
+
+    def test_expires_at_kickoff(self):
+        world, picks, opp, out = self._issue()
+        eng = Engine(self.cfg, self.dir, http=world, now=datetime(2026, 11, 7, 13, 55, tzinfo=timezone.utc))
+        eng.run()
+        o = eng.store.one("SELECT * FROM opportunities")
+        eng.close()
+        self.assertEqual(o["status"], "EXPIRED")
+
+    def test_stop_and_start(self):
+        from fbs.__main__ import _dispatch
+        world, picks = self._prepare(["PASSED", "PASSED"])
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW)
+        _dispatch(eng, "stop", [])
+        eng.close()
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=5))
+        out = eng.run()
+        self.assertEqual(eng.store.one("SELECT COUNT(*) FROM opportunities")[0], 0)
+        self.assertIn("not scanning: AI stopped from the app (press START to resume)", out["log"])
+        _dispatch(eng, "start", [])
+        eng.close()
+        eng = Engine(self.cfg, self.dir, http=world, now=NOW + timedelta(minutes=10))
+        eng.run()
+        self.assertEqual(eng.store.one("SELECT COUNT(*) FROM opportunities")[0], 1)
+        eng.close()

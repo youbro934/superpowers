@@ -70,6 +70,20 @@ class Engine:
         self._results_cache: dict = {}
 
     # ------------------------------------------------------------------ utils
+    def app_link(self, opp_id: str | None = None) -> str | None:
+        if not self.cfg.app_url:
+            return None
+        return self.cfg.app_url + (f"#opp={opp_id}" if opp_id else "")
+
+    @property
+    def opps(self):
+        from .opportunities import Opportunities
+        return Opportunities(self)
+
+    @property
+    def ai_enabled(self) -> bool:
+        return bool(self.store.get("ai_enabled", True))
+
     @property
     def now(self) -> datetime:
         return self._now or utcnow()
@@ -103,8 +117,8 @@ class Engine:
         try:
             self._startup()
             for step in (self.recover, self.collect, self.settle_open, self.settle_shadow,
-                         self.settle_shadow_entries, self.refresh_predictions, self.scan_and_bet,
-                         self.daily_notices, self.reliability_checks):
+                         self.settle_shadow_entries, self.refresh_predictions, self.revalidate_opportunities,
+                         self.scan_and_bet, self.daily_notices, self.reliability_checks):
                 try:
                     step()
                 except Exception as e:   # keep going; report the failure
@@ -127,6 +141,8 @@ class Engine:
             self.store.commit()
             self.heartbeat(status)
             dashboard.write(self)
+            from .state_export import write_state
+            write_state(self)
         return {"status": status, "log": self.log, "bankroll": self.bank.balance,
                 "state": self.bank.status}
 
@@ -273,6 +289,13 @@ class Engine:
             self.store.commit()
             legs = [dict(l) for l in self.store.q("SELECT * FROM legs WHERE bet_id=?", (bet["id"],))]
             outcome, eff_odds = bet_outcome(legs)
+            if outcome == "WON":
+                # pay at the odds actually accepted; a void leg is removed at its own price
+                void = 1.0
+                for l in legs:
+                    if l["result"] == "void":
+                        void *= l["odds"]
+                eff_odds = bet["odds"] / void
             if outcome:
                 self._finish_bet(bet, outcome, eff_odds, legs)
 
@@ -364,11 +387,22 @@ class Engine:
         if self.odds.remaining is not None:
             self.store.set("odds_remaining", self.odds.remaining)
 
+    def revalidate_opportunities(self):
+        self.opps.revalidate()
+
     def scan_and_bet(self):
+        if not self.ai_enabled:
+            self.note("not scanning: AI stopped from the app (press START to resume)")
+            return
         ok, why = self.bank.can_bet(self.today)
         if not ok:
             self.note(f"not scanning: {why}")
             return
+        if self.cfg.execution_mode == "manual":
+            block = self.opps.blocking()
+            if block:
+                self.note(f"not scanning: {block}")
+                return
         rejected: dict = {}
         legs: list[Leg] = []
         scanned = 0
@@ -784,6 +818,10 @@ class Engine:
         return out
 
     def place(self, cand):
+        if self.cfg.execution_mode == "manual":
+            oid = self.opps.create(cand)
+            self.note(f"opportunity {oid} issued" if oid else "duplicate opportunity suppressed")
+            return
         slot = self.bank.bets_on(self.today) + 1
         attempt = self.store.one("SELECT COUNT(*) FROM bets WHERE local_date=? AND slot=?", (self.today, slot))[0] + 1
         client_ref = f"{self.today}-s{slot}-a{attempt}"

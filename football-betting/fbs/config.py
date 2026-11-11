@@ -122,7 +122,7 @@ class Settings:
     alert_dedupe_hours: float = 6.0
 
     # --- execution ---
-    execution_mode: str = "paper"
+    execution_mode: str = "manual"   # manual: cards to the iPhone, owner places bets; paper: simulated
     live_confirmation: str = ""
 
     # --- secrets ---
@@ -136,6 +136,7 @@ class Settings:
     telegram_chat_id: str = ""
     healthcheck_url: str = ""
     dashboard_url: str = ""
+    app_url: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -153,7 +154,7 @@ class Settings:
         s.odds_credit_reserve = _int("FBS_ODDS_CREDIT_RESERVE", s.odds_credit_reserve)
         books = _env("FBS_ALLOWED_BOOKMAKERS")
         s.allowed_bookmakers = [b.strip() for b in books.split(",") if b.strip()]
-        s.execution_mode = _env("FBS_EXECUTION_MODE", "paper").lower() or "paper"
+        s.execution_mode = _env("FBS_EXECUTION_MODE", "manual").lower() or "manual"
         s.live_confirmation = _env("FBS_LIVE_CONFIRMATION")
         s.odds_api_key = _env("ODDS_API_KEY")
         s.football_data_org_key = _env("FOOTBALL_DATA_ORG_KEY")
@@ -165,4 +166,5 @@ class Settings:
         s.telegram_chat_id = _env("TELEGRAM_CHAT_ID")
         s.healthcheck_url = _env("HEALTHCHECK_URL")
         s.dashboard_url = _env("FBS_DASHBOARD_URL")
+        s.app_url = _env("FBS_APP_URL")
         return s

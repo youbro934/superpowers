@@ -46,7 +46,7 @@ class PaperExecutor(Executor):
 
 
 def build_executor(cfg: Settings, store) -> Executor:
-    if cfg.execution_mode == "paper":
+    if cfg.execution_mode in ("paper", "manual"):
         return PaperExecutor(store)
     if cfg.execution_mode == "live":
         if cfg.live_confirmation != LIVE_CONFIRMATION_PHRASE:

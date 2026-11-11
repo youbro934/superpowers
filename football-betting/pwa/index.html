@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bets">
+<meta name="theme-color" content="#0e5c3a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Football Bets</title>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--text:#14181d;--muted:#5d6672;--line:#e1e5ea;--accent:#0e5c3a;--accent2:#14804f;
+--good:#127a3e;--bad:#b42318;--warn:#9a5b00;--chip:#eef2f5;--shadow:0 1px 2px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--text:#e8ebef;--muted:#9aa4af;--line:#2a313b;
+--accent:#2fb874;--accent2:#43d18a;--good:#4cc38a;--bad:#ff7b6b;--warn:#f0b35b;--chip:#222833;--shadow:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(env(safe-area-inset-top) + 10px) 16px 8px;border-bottom:1px solid var(--line)}
+header h1{font-size:22px;margin:0;display:flex;justify-content:space-between;align-items:center}
+.sub{color:var(--muted);font-size:13px}
+main{padding:12px 16px calc(env(safe-area-inset-bottom) + 84px);max-width:640px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px;box-shadow:var(--shadow)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.v{font-size:22px;font-weight:650;margin-top:2px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--chip);color:var(--muted)}
+.pill.on{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.off{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+button,.btn{appearance:none;border:0;border-radius:12px;padding:13px 14px;font:600 16px/1 inherit;font-family:inherit;cursor:pointer;
+display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;min-height:46px}
+.primary{background:var(--accent);color:#fff}.secondary{background:var(--chip);color:var(--text)}
+.danger{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.full{width:100%}.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.opp{scroll-margin-top:96px}.opp h2{font-size:18px;margin:0}
+.big{font-size:30px;font-weight:700}
+.sel{border-top:1px solid var(--line);padding:10px 0}
+.sel:first-of-type{border-top:0}
+.sel .m{font-size:13px;color:var(--muted)}
+.sel .why{font-size:12px;color:var(--muted);margin-top:3px}
+.odds{font-weight:700;font-variant-numeric:tabular-nums}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:14px;margin-top:8px}
+.facts div span{color:var(--muted)}
+.notice{font-size:13px;color:var(--muted);margin-top:10px}
+.empty{color:var(--muted);text-align:center;padding:22px 8px}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);background:var(--card);
+border-top:1px solid var(--line);padding:6px 4px calc(env(safe-area-inset-bottom) + 6px)}
+nav button{background:none;color:var(--muted);font-size:11px;flex-direction:column;gap:2px;padding:6px 0;min-height:44px}
+nav button.active{color:var(--accent)}
+nav svg{width:22px;height:22px}
+.list .item{border-top:1px solid var(--line);padding:10px 0}.list .item:first-child{border-top:0}
+input,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:16px inherit;font-family:inherit}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 80px);background:var(--text);color:var(--bg);
+padding:12px 14px;border-radius:12px;font-size:14px;display:none;z-index:9}
+dialog{border:0;border-radius:16px;padding:16px;background:var(--card);color:var(--text);width:min(92vw,480px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.good{color:var(--good)}.bad{color:var(--bad)}.muted{color:var(--muted)}
+.hidden{display:none}
+pre{white-space:pre-wrap;font:13px/1.4 ui-monospace,Menlo,monospace;background:var(--chip);padding:10px;border-radius:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Football Bets</span><span id="aiPill" class="pill">…</span></h1>
+  <div class="sub" id="updated">Loading…</div>
+</header>
+<main>
+  <section id="tab-home"></section>
+  <section id="tab-bets" class="hidden"></section>
+  <section id="tab-stats" class="hidden"></section>
+  <section id="tab-alerts" class="hidden"></section>
+  <section id="tab-settings" class="hidden"></section>
+</main>
+<nav id="nav">
+  <button data-tab="home" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-tab="bets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Bets</button>
+  <button data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+  <button data-tab="alerts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg>Alerts</button>
+  <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+</nav>
+<div class="toast" id="toast"></div>
+<dialog id="confirmDlg">
+  <h3 style="margin:0 0 4px">I placed this bet</h3>
+  <div class="sub">Only confirm after Bet365 accepted it. Enter what Bet365 shows.</div>
+  <label>Stake (€)</label><input id="cStake" inputmode="decimal">
+  <label>Accepted combined odds</label><input id="cOdds" inputmode="decimal">
+  <label>Bet365 reference (optional)</label><input id="cRef" autocomplete="off">
+  <div class="btns"><button class="secondary" id="cCancel">Cancel</button><button class="primary" id="cSend">Record bet</button></div>
+</dialog>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur = c => (c < 0 ? "-€" : "€") + (Math.abs(c) / 100).toFixed(2);
+const pct = x => x == null ? "—" : (x * 100).toFixed(1) + "%";
+const BET365 = "https://www.bet365.com/";
+let S = null, tab = "home";
+const cfg = () => { try { return JSON.parse(localStorage.getItem("fbs-cfg") || "{}"); } catch { return {}; } };
+const saveCfg = c => { try { localStorage.setItem("fbs-cfg", JSON.stringify(c)); } catch {} };
+const t = iso => iso ? new Date(iso).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"}) : "—";
+const tm = iso => iso ? new Date(iso).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : "—";
+function toast(m, ms = 3500){ const e = $("#toast"); e.textContent = m; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = "none", ms); }
+function title(s){ return String(s || "").replace(/\b\w/g, c => c.toUpperCase()); }
+
+async function load(){
+  try {
+    const r = await fetch("../state.json?ts=" + Date.now(), {cache: "no-store"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    S = await r.json();
+    render();
+  } catch (e) {
+    $("#updated").textContent = "Could not load state (" + e.message + "). Showing last copy if any.";
+  }
+}
+
+async function command(command, payload){
+  const c = cfg();
+  if (!c.token || !c.owner || !c.repo) { toast("Add your GitHub token in Settings first"); show("settings"); return false; }
+  const inputs = {command};
+  if (command === "continue") inputs.confirm = payload;
+  else if (payload) inputs.payload = JSON.stringify(payload);
+  const r = await fetch(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/actions/workflows/football-betting.yml/dispatches`, {
+    method: "POST", headers: {"Authorization": "Bearer " + c.token, "Accept": "application/vnd.github+json"},
+    body: JSON.stringify({ref: c.ref || "main", inputs})});
+  if (r.status === 204) { toast("Sent. The cloud applies it in about 1–2 minutes."); pollFor(120); return true; }
+  toast("Command failed: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (check token)" : ""), 6000);
+  return false;
+}
+function pollFor(sec){ let n = 0; const i = setInterval(() => { load(); if ((n += 15) >= sec) clearInterval(i); }, 15000); }
+
+function show(name){
+  tab = name;
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("hidden", s.id !== "tab-" + name));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  window.scrollTo(0, 0);
+}
+
+function oppCard(o){
+  const real = o.kind === "REAL";
+  const legs = o.legs.map(l => `<div class="sel"><div class="row"><b>${esc(l.label)}</b><span class="odds">${Number(l.odds).toFixed(2)}</span></div>
+    <div class="m">${esc(title(l.home))} v ${esc(title(l.away))} · ${esc(t(l.kickoff))} · ${esc(l.bookmaker)} · ${esc(l.status)}</div>
+    <div class="why">${esc(l.why || "")}</div></div>`).join("");
+  const stake = o.stake_cents, q = o.quality || {};
+  const status = o.status === "OPEN" ? `<span class="pill on">OPEN</span>` :
+    `<span class="pill ${o.status === "CONFIRMED" ? "on" : "warn"}">${esc(o.status)}</span>`;
+  const open = o.status === "OPEN" && real;
+  return `<div class="card opp" id="opp-${esc(o.id)}">
+    <div class="row"><h2>${real ? "NEW OPPORTUNITY" : "SHADOW (not a recommendation)"}</h2>${status}</div>
+    <div class="sub">${esc(o.id)} · expires ${esc(tm(o.expires_at))}${o.note ? " · " + esc(o.note) : ""}</div>
+    <div class="row" style="margin-top:10px"><div><div class="k">Combined odds</div><div class="big">${Number(o.odds).toFixed(2)}</div></div>
+      <div style="text-align:right"><div class="k">Stake → return</div><div class="v">${eur(stake)} → ${eur(Math.floor(stake * o.odds))}</div></div></div>
+    <div style="margin-top:6px">${legs}</div>
+    <div class="facts"><div><span>Probability</span><br><b>${pct(o.prob)}</b></div><div><span>Edge</span><br><b>${pct(o.ev)}</b></div>
+      <div><span>Odds verified</span><br><b>${esc(tm(o.verified_at))}</b> (${esc(q.odds_age_minutes ?? "?")} min old)</div>
+      <div><span>Validation</span><br><b>${esc((q.gate || []).join(", "))}</b></div></div>
+    ${open ? `<a class="btn primary full" style="margin-top:12px" href="${BET365}" target="_blank" rel="noopener">OPEN BET365</a>
+      <div class="btns"><button class="secondary" data-copy="${esc(o.id)}">Copy selections</button>
+      <button class="secondary" data-placed="${esc(o.id)}">I placed this bet</button></div>
+      <button class="danger full" style="margin-top:8px" data-decline="${esc(o.id)}">Decline</button>
+      <div class="notice">Check every price at Bet365 before placing. Opening Bet365 does not place a bet; only your own confirmation in Bet365 does.</div>` : ""}
+  </div>`;
+}
+
+function render(){
+  if (!S) return;
+  const ai = S.ai_enabled && S.status === "ACTIVE";
+  $("#aiPill").className = "pill " + (S.status === "STOPPED_TARGET" ? "warn" : ai ? "on" : "off");
+  $("#aiPill").textContent = S.status === "STOPPED_TARGET" ? "€500 STOP" : S.status === "BUSTED" ? "LOST" : ai ? "AI RUNNING" : "AI STOPPED";
+  const age = Math.round((Date.now() - new Date(S.generated_at)) / 60000);
+  $("#updated").textContent = `Cloud update ${tm(S.generated_at)} (${age} min ago) · mode ${S.mode}`;
+  const net = S.bankroll_cents - S.initial_cents;
+  const open = S.opportunities.filter(o => o.status === "OPEN");
+  const pend = S.bets.filter(b => b.status === "OPEN" || b.status === "PLACING");
+  const lr = S.last_run || {};
+  let h = "";
+  if (S.status === "STOPPED_TARGET") h += `<div class="card"><b>€500 reached.</b> New recommendations are blocked.
+    Bankroll ${eur(S.bankroll_cents)}, net ${eur(net)}.<button class="primary full" style="margin-top:10px" id="btnContinue">CONTINUE</button></div>`;
+  h += `<div class="card"><div class="grid">
+     <div><div class="k">Bankroll</div><div class="v">${eur(S.bankroll_cents)}</div></div>
+     <div><div class="k">Profit / loss</div><div class="v ${net >= 0 ? "good" : "bad"}">${eur(net)}</div></div>
+     <div><div class="k">Pending bets</div><div class="v">${pend.length}</div></div>
+     <div><div class="k">Next stake</div><div class="v">${eur(S.cash_cents)}</div></div></div>
+     <div class="btns"><button class="primary" id="btnStart">START AI</button><button class="danger" id="btnStop">STOP AI</button></div>
+     <div class="notice">Last cloud run: ${esc(lr.status || "—")} at ${esc(tm(lr.started_at))}. Odds target ${S.odds_range[0].toFixed(2)}–${S.odds_range[1].toFixed(2)}, max ${S.max_per_day} per day.</div></div>`;
+  h += `<h3>Opportunities</h3>`;
+  h += open.length ? open.map(oppCard).join("") : `<div class="card empty">No open opportunity. The AI only recommends entries that pass every check; most days that means NO BET.</div>`;
+  const dec = (S.decisions || [])[0];
+  if (dec) h += `<div class="card"><div class="k">Latest decision</div><div style="margin-top:4px">${esc(dec.reason)}</div></div>`;
+  if ((S.shadow_entries || []).length) h += `<h3>Shadow entries <span class="pill">not recommendations</span></h3>` +
+    S.shadow_entries.slice(0, 3).map(x => `<div class="card"><div class="row"><b>@ ${Number(x.odds).toFixed(2)}</b><span class="pill">${esc(x.result || "pending")}</span></div>
+      ${x.legs.map(l => `<div class="sub">${esc(title(l.home))} v ${esc(title(l.away))}: ${esc(l.market)} ${esc(l.selection)} ${l.line ?? ""} @ ${Number(l.odds).toFixed(2)}</div>`).join("")}
+      <div class="notice">Uses a market still being validated. Not to be bet.</div></div>`).join("");
+  $("#tab-home").innerHTML = h;
+
+  const betItem = b => `<div class="item"><div class="row"><b>${esc(b.local_date)} · ${eur(b.stake_cents)} @ ${Number(b.odds).toFixed(2)}</b>
+     <span class="pill ${b.status === "WON" ? "on" : b.status === "LOST" ? "off" : ""}">${esc(b.status)}</span></div>
+     <div class="sub">${esc(b.mode)}${b.bookmaker ? " · " + esc(b.bookmaker) : ""}${b.reference ? " · ref " + esc(b.reference) : ""}${b.return_cents != null ? " · return " + eur(b.return_cents) : ""}
+     · ${b.verified ? "result verified from data" : "settled manually"}</div>
+     ${(b.legs || []).map(l => `<div class="sub">• ${esc(title(l.home))} v ${esc(title(l.away))}: ${esc(l.market)} ${esc(l.selection)} ${l.line ?? ""} [${esc(l.result)}]</div>`).join("")}</div>`;
+  const settled = S.bets.filter(b => ["WON","LOST","VOID"].includes(b.status));
+  $("#tab-bets").innerHTML = `<h3>Pending</h3><div class="card list">${pend.length ? pend.map(betItem).join("") : '<div class="empty">None</div>'}</div>
+    <h3>Settled</h3><div class="card list">${settled.length ? settled.map(betItem).join("") : '<div class="empty">None yet</div>'}</div>
+    <h3>Opportunity history</h3><div class="card list">${S.opportunities.length ? S.opportunities.map(o => `<div class="item"><div class="row"><b>${esc(o.id)} @ ${Number(o.odds).toFixed(2)}</b><span class="pill">${esc(o.status)}</span></div><div class="sub">${o.legs.map(l => esc(l.label)).join(" · ")}</div></div>`).join("") : '<div class="empty">None yet</div>'}</div>`;
+
+  const st = S.stats;
+  const gate = Object.entries(S.gate || {}).map(([k, v]) => `<div class="row item"><span>${esc(k)}</span><span class="pill ${v === "PASSED" ? "on" : v === "SHADOW" ? "warn" : "off"}">${esc(v)}</span></div>`).join("");
+  $("#tab-stats").innerHTML = `<div class="card"><div class="grid">
+    <div><div class="k">Bets settled</div><div class="v">${st.bets}</div></div><div><div class="k">Won / lost</div><div class="v">${st.won} / ${st.lost}</div></div>
+    <div><div class="k">Staked</div><div class="v">${eur(st.staked_cents)}</div></div><div><div class="k">ROI</div><div class="v">${pct(st.roi)}</div></div></div>
+    <div class="notice">Small samples prove nothing. Reaching €500 from €10 at 1.30–1.40 needs 12–15 wins in a row.</div></div>
+    <h3>Market validation</h3><div class="card list">${gate || '<div class="empty">Research not run yet</div>'}</div>
+    <h3>Ledger</h3><div class="card list">${(S.ledger || []).slice(0, 30).map(r => `<div class="item row"><span>${esc(tm(r.ts))} ${esc(r.kind)}</span><span>${eur(r.amount_cents)} → ${eur(r.balance_cents)}</span></div>`).join("")}</div>
+    <h3>Data providers</h3><div class="card list">${(S.providers || []).map(p => `<div class="item"><div class="row"><b>${esc(p.provider)}</b><span class="pill ${p.consecutive_failures ? "off" : "on"}">${p.consecutive_failures ? p.consecutive_failures + " fail" : "ok"}</span></div><div class="sub">${esc(p.last_error || "")}</div></div>`).join("") || '<div class="empty">No calls yet</div>'}
+    <div class="sub">API-Football requests today: ${S.apif_requests_today} / 100</div></div>`;
+
+  $("#tab-alerts").innerHTML = `<div class="card list">${(S.notifications || []).map(n => `<div class="item"><div class="row"><b>${esc(n.title)}</b><span class="sub">${esc(tm(n.ts))}</span></div><div class="sub" style="white-space:pre-wrap">${esc(n.body)}</div></div>`).join("") || '<div class="empty">No notifications</div>'}</div>`;
+  renderSettings();
+  bind();
+  const m = location.hash.match(/opp=([\w-]+)/);
+  if (m) { const el = document.getElementById("opp-" + m[1]); if (el) { show("home"); el.scrollIntoView({behavior: "smooth"}); } }
+}
+
+function renderSettings(){
+  const c = cfg();
+  $("#tab-settings").innerHTML = `<div class="card">
+    <b>Cloud control</b><div class="sub">Commands run as GitHub Actions in your repository. The token stays on this iPhone only.</div>
+    <label>GitHub owner</label><input id="sOwner" value="${esc(c.owner || "youbro934")}" autocapitalize="off">
+    <label>Repository</label><input id="sRepo" value="${esc(c.repo || "superpowers")}" autocapitalize="off">
+    <label>Branch</label><input id="sRef" value="${esc(c.ref || "main")}" autocapitalize="off">
+    <label>Fine-grained token (Actions: read and write, this repository only)</label><input id="sToken" type="password" value="${esc(c.token || "")}" autocomplete="off">
+    <button class="primary full" style="margin-top:12px" id="sSave">Save</button></div>
+    <div class="card"><b>Push notifications</b><div class="sub">Install the free <b>ntfy</b> app and subscribe to your private topic (the NTFY_TOPIC secret).
+    Alerts arrive even when this app is closed; tapping one opens the matching card here.</div>
+    <button class="secondary full" style="margin-top:10px" id="sTest">Send test notification</button></div>`;
+}
+
+function bind(){
+  const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
+  on("btnStart", () => command("start"));
+  on("btnStop", () => { if (confirm("Stop issuing opportunities? Open bets keep being tracked.")) command("stop"); });
+  on("btnContinue", () => { if (prompt('Type CONTINUE to resume after the €500 stop') === "CONTINUE") command("continue", "CONTINUE"); });
+  on("sSave", () => { saveCfg({owner: $("#sOwner").value.trim(), repo: $("#sRepo").value.trim(), ref: $("#sRef").value.trim() || "main", token: $("#sToken").value.trim()}); toast("Saved on this device"); });
+  on("sTest", () => command("notify-test"));
+  document.querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
+    const o = S.opportunities.find(x => x.id === b.dataset.copy);
+    const txt = o.legs.map(l => `${title(l.home)} v ${title(l.away)} (${t(l.kickoff)}): ${l.label} @ ${Number(l.odds).toFixed(2)}`).join("\n") +
+      `\nCombined ${Number(o.odds).toFixed(2)} · stake ${eur(o.stake_cents)}`;
+    try { await navigator.clipboard.writeText(txt); toast("Selections copied"); } catch { prompt("Copy the selections:", txt); }
+  });
+  document.querySelectorAll("[data-decline]").forEach(b => b.onclick = () => { if (confirm("Decline this opportunity?")) command("reject", {id: b.dataset.decline}); });
+  document.querySelectorAll("[data-placed]").forEach(b => b.onclick = () => {
+    const o = S.opportunities.find(x => x.id === b.dataset.placed);
+    $("#cStake").value = (o.stake_cents / 100).toFixed(2); $("#cOdds").value = Number(o.odds).toFixed(2); $("#cRef").value = "";
+    const d = $("#confirmDlg"); d.showModal();
+    $("#cCancel").onclick = () => d.close();
+    $("#cSend").onclick = async () => {
+      const stake = parseFloat($("#cStake").value.replace(",", ".")), odds = parseFloat($("#cOdds").value.replace(",", "."));
+      if (!(stake > 0) || !(odds > 1)) { toast("Enter the stake and the odds Bet365 accepted"); return; }
+      if (await command("confirm", {id: o.id, stake, odds, bookmaker: "Bet365", reference: $("#cRef").value.trim(), placed_at: new Date().toISOString()})) d.close();
+    };
+  });
+}
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.tab));
+window.addEventListener("hashchange", render);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+load(); setInterval(load, 60000);
+</script>
+</body>
+</html>

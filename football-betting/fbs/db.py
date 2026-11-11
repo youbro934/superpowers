@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS predictions (
 CREATE TABLE IF NOT EXISTS shadow_entries (
   id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, local_date TEXT NOT NULL, odds REAL, prob REAL, ev REAL,
   legs TEXT NOT NULL, result TEXT, settled_at TEXT, UNIQUE(local_date, legs));
+CREATE TABLE IF NOT EXISTS opportunities (
+  id TEXT PRIMARY KEY, created_at TEXT NOT NULL, local_date TEXT NOT NULL, expires_at TEXT NOT NULL,
+  status TEXT NOT NULL, kind TEXT NOT NULL, odds REAL, prob REAL, ev REAL, stake_cents INTEGER,
+  legs TEXT NOT NULL, quality TEXT, verified_at TEXT, explanation TEXT, signature TEXT, bet_id INTEGER,
+  updated_at TEXT, note TEXT);
 CREATE TABLE IF NOT EXISTS ratings (competition TEXT PRIMARY KEY, fitted_at TEXT, model TEXT);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, dedupe_key TEXT, title TEXT, body TEXT,
@@ -71,7 +76,19 @@ class Store:
             self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self):
+        """Additive column migrations; existing data is never dropped."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(bets)")}
+        for name, typ in (("opportunity_id", "TEXT"), ("bookmaker", "TEXT"), ("reference", "TEXT"),
+                          ("placed_at", "TEXT"), ("settle_source", "TEXT"), ("suggested_stake_cents", "INTEGER")):
+            if name not in cols:
+                self.conn.execute(f"ALTER TABLE bets ADD COLUMN {name} {typ}")
+        ncols = {r[1] for r in self.conn.execute("PRAGMA table_info(notifications)")}
+        if "extra" not in ncols:
+            self.conn.execute("ALTER TABLE notifications ADD COLUMN extra TEXT")
 
     # --- helpers ---
     def q(self, sql: str, args=()) -> list[sqlite3.Row]:
