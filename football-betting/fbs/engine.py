@@ -103,7 +103,7 @@ class Engine:
         try:
             self._startup()
             for step in (self.recover, self.settle_open, self.settle_shadow, self.scan_and_bet,
-                         self.daily_notices, self.reliability_checks):
+                         self.collect, self.daily_notices, self.reliability_checks):
                 try:
                     step()
                 except Exception as e:   # keep going; report the failure
@@ -465,6 +465,23 @@ class Engine:
                  l.kickoff, l.market, l.selection, l.line, l.odds, l.odds, l.bookmaker, l.p_model, l.p_market,
                  l.p_used, l.ev, "market not validated"))
         return kept
+
+    def collect(self):
+        """Forward archive of odds/stats/team news for markets without free history (API-Football)."""
+        if not self.apif.enabled:
+            return
+        from .research.collector import Collector
+        c = Collector(self.cfg.api_football_key, os.path.join(self.dir, "archive", "api-football"), self.store,
+                      self.http, now=self._now)
+        try:
+            done = c.run()
+            self.store.provider_ok("api-football:collector")
+            if any(done.values()):
+                self.note(f"collected {done}")
+        except ProviderError as e:
+            if "budget" in str(e):
+                return
+            self.provider_error("api-football:collector", e)
 
     def settle_shadow(self):
         """Settle shadow selections with free result sources so forward evidence accumulates."""
