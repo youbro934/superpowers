@@ -47,6 +47,7 @@ REJECTED: asian_handicap, double_chance, result; SHADOW: btts, cards_total, corn
 Only PASSED markets can be used by the paper bankroll.','default','bar_chart',0,0,NULL,NULL);
 INSERT INTO "notifications" VALUES(9,'2026-11-11T19:04:01Z','config:missing','Setup incomplete','Missing secrets: ODDS_API_KEY, FOOTBALL_DATA_ORG_KEY. Scanning/settlement are limited until they are added.','high','warning',0,0,NULL,NULL);
 INSERT INTO "notifications" VALUES(10,'2026-11-11T20:10:52Z',NULL,'AI stopped','No new opportunities will be issued. Open bets are still tracked and settled.','default','stop_button',0,0,NULL,NULL);
+INSERT INTO "notifications" VALUES(11,'2026-11-11T20:16:27Z',NULL,'Confirm not recorded','unknown opportunity','default','warning',0,0,NULL,NULL);
 CREATE TABLE opportunities (
   id TEXT PRIMARY KEY, created_at TEXT NOT NULL, local_date TEXT NOT NULL, expires_at TEXT NOT NULL,
   status TEXT NOT NULL, kind TEXT NOT NULL, odds REAL, prob REAL, ev REAL, stake_cents INTEGER,
