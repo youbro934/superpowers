@@ -18,6 +18,43 @@ Runs every hour on GitHub Actions, on GitHub's servers, so your computer doesn't
 7. **Executes** through the paper executor. No money moves.
 8. **Pushes** notifications to your iPhone and rebuilds the dashboard and CSV exports.
 
+## Multi-market research and the promotion gate
+
+The paper bankroll can only stake markets that **passed out-of-sample validation**. `python -m fbs research`
+runs automatically every Monday and can also be run from the Actions tab. It:
+
+1. **Loads every free historical source with provenance**: football-data.co.uk (4 seasons, 17 leagues), giving goals,
+   half-time goals, shots, shots on target, corners, fouls, yellow and red cards, referees (English leagues), and
+   opening and closing 1X2, over/under 2.5 and Asian handicap odds. It adds whatever this system has collected
+   forward from API-Football.
+2. **Builds pre-match features from earlier matches only**: last 5/10/15 form for and against, home/away form,
+   head-to-head, shots and shots on target (as a stand-in for xG), rest days, referee tendencies. Each value is
+   relative to the league average at that date and shrunk toward it when the sample is small.
+3. **Fits separate models per market**:
+   * Dixon-Coles scores for match result, double chance, BTTS and Asian handicap.
+   * Count GLMs with negative-binomial dispersion and a per-league baseline for goals, team goals,
+     half-time goals, corners (total and team), fouls (total and team), yellows (total and team), red cards
+     and total cards.
+4. **Walks forward month by month.** Every selection is scored out of sample: Brier score, log loss, calibration,
+   and predicted vs actual rate with a Wilson interval. The reference is the de-vigged closing odds where historical
+   prices exist, otherwise the league base rate.
+5. **Simulates value bets where real prices exist**: ROI at the pre-match price with a 95% interval, ROI at closing prices,
+   closing-line value, results by league, and the sample size needed for significance.
+6. **Writes** `research.html`, `research.json` and `gate.json` to the `fbs-data` branch.
+
+| Gate status | Meaning |
+|---|---|
+| PASSED | Real historical prices, ≥300 value bets, ROI 95% interval above 0, CLV interval above 0, calibration error ≤3%. Only these can be staked. |
+| SHADOW | No historical prices exist, but the model is calibrated and beats the base rate on 500+ matches. It is logged forward against live odds, with no stake. |
+| REJECTED | Anything else. |
+
+**Combined entries.** Selections from different matches are treated as independent. Same-match goal selections
+(e.g. home win and over 2.5) are evaluated together on the joint score distribution. Same-match mixes with no
+joint model (e.g. goals + corners) are refused: the research report shows these totals are correlated.
+
+**Not available from any free source:** corners per half, player-level fouls, and historical xG. API-Football
+provides xG, lineups, injuries and referees forward, for the matches the system collects.
+
 ## Bankroll rules (enforced in `fbs/bankroll.py`, covered by tests)
 
 | Rule | Behaviour |
@@ -46,7 +83,9 @@ from a €10 all-in bankroll that is never topped up. Whether the model has any 
    * The Odds API: https://the-odds-api.com (free plan, 500 credits/month). The system spreads the credits evenly
      across the month.
    * football-data.org: https://www.football-data.org/client/register (free plan, used for results).
-   * Optional: API-Football (https://www.api-football.com, free 100 requests/day) for injuries and corner/card stats.
+   * Recommended: API-Football (https://www.api-football.com, free 100 requests/day). It gives forward odds for corners,
+     cards, team goals, BTTS and half markets, plus xG, referees, lineups and injuries; Brazil comes first. Without it
+     those markets can never get priced evidence.
 2. **iPhone notifications.** Install the free **ntfy** app and subscribe to a long random topic name, e.g.
    `fbs-` followed by 20 random characters. Anyone who knows the topic can read it, so keep it secret.
    Telegram also works (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`).
@@ -69,7 +108,8 @@ From the Actions tab (*Run workflow*), or locally with `python -m fbs --data-dir
 | `run` | One full cycle (the hourly job). |
 | `status` | Bankroll, state, open bets. |
 | `continue` | Resume after the €500 stop. The confirm box must say exactly `CONTINUE`. |
-| `backtest` | Walk-forward test over the last 365 days of closing odds. Writes `backtest.json` and pushes the summary to your phone. |
+| `backtest` | The original goal-model backtest (365 days). |
+| `research` | Multi-market research + promotion gate (weekly on Mondays). Writes `research.html` / `gate.json`. |
 | `notify-test` | Sends a test push. |
 | `settle LEG_ID void` | Local only: void a postponed or abandoned selection. |
 
