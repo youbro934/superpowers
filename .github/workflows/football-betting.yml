@@ -4,9 +4,11 @@ name: Football Betting System
 # `fbs-data` branch as a text SQL dump plus a static dashboard (index.html).
 # Scheduled runs only fire from the repository's default branch.
 
+# DISABLED in this public repository. The system moved to the private repository
+# youbro934/AI-Football-Betting-System. No schedule, and the cycle job never runs here,
+# so no betting state is written to this public repository any more.
+# History (including the fbs-data branch) is kept as it is.
 on:
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       command:
@@ -39,7 +41,7 @@ jobs:
         run: python -m unittest discover -s tests -t . -v
 
   cycle:
-    if: github.event_name != 'push'
+    if: false   # disabled: public repository
     runs-on: ubuntu-latest
     timeout-minutes: 50
     # one cycle at a time, never cancelled midway: no overlapping bets, no lost state
