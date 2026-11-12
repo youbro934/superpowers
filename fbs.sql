@@ -67,6 +67,8 @@ INSERT INTO "runs" VALUES(1,'2026-11-11T19:04:01Z','2026-11-11T19:04:01Z','ok','
 not scanning: no odds source configured (ODDS_API_KEY / API_FOOTBALL_KEY)');
 INSERT INTO "runs" VALUES(2,'2026-11-11T20:10:36Z','2026-11-11T20:10:36Z','ok','missing secrets: ODDS_API_KEY, FOOTBALL_DATA_ORG_KEY
 not scanning: no odds source configured (ODDS_API_KEY / API_FOOTBALL_KEY)');
+INSERT INTO "runs" VALUES(3,'2026-11-12T00:48:14Z','2026-11-12T00:48:14Z','ok','missing secrets: ODDS_API_KEY, FOOTBALL_DATA_ORG_KEY
+not scanning: ODDS_API_KEY missing');
 CREATE TABLE shadow (
   id INTEGER PRIMARY KEY, first_seen TEXT NOT NULL, last_seen TEXT, local_date TEXT, event_id TEXT NOT NULL,
   sport_key TEXT, competition TEXT, home TEXT, away TEXT, kickoff TEXT, market TEXT NOT NULL,
